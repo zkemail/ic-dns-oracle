@@ -1,0 +1,30 @@
+{
+  "canisters": {
+    "ic_dns_oracle_backend": {
+      "candid": "src/ic_dns_oracle_backend/ic_dns_oracle_backend.did",
+      "package": "ic_dns_oracle_backend",
+      "type": "rust"
+    },
+    "ic_dns_oracle_frontend": {
+      "dependencies": [
+        "ic_dns_oracle_backend"
+      ],
+      "frontend": {
+        "entrypoint": "src/ic_dns_oracle_frontend/src/index.html"
+      },
+      "source": [
+        "src/ic_dns_oracle_frontend/assets",
+        "dist/ic_dns_oracle_frontend/"
+      ],
+      "type": "assets"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
