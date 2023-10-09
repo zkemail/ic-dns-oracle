@@ -3,7 +3,8 @@
     "ic_dns_oracle_backend": {
       "candid": "src/ic_dns_oracle_backend/ic_dns_oracle_backend.did",
       "package": "ic_dns_oracle_backend",
-      "type": "rust"
+      "type": "rust",
+      "optimize": "size"
     },
     "ic_dns_oracle_frontend": {
       "dependencies": [
