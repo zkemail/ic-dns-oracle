@@ -1,9 +1,12 @@
 use base64::{engine::general_purpose, Engine as _};
 use candid::{CandidType, Principal};
 use hex;
-use ic_cdk::api::management_canister::http_request::{
-    http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse, TransformArgs,
-    TransformContext,
+use ic_cdk::{
+    api::management_canister::http_request::{
+        http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse,
+        TransformArgs, TransformContext,
+    },
+    caller,
 };
 // use ic_cdk::export::{candid::CandidType, Principal};
 use ic_evm_sign;
@@ -37,18 +40,18 @@ thread_local! {
 }
 
 #[ic_cdk::init]
-async fn init(evn_opt: Option<Environment>) {
+pub async fn init(evn_opt: Option<Environment>) {
     ic_evm_sign::init(evn_opt);
 }
 
 #[ic_cdk::query]
-async fn get_ethereum_address() -> String {
+pub async fn get_ethereum_address() -> String {
     let canister_state = CANISTER_STATE.with(|s| s.borrow().clone());
     canister_state.address
 }
 
 #[ic_cdk::update]
-async fn create_ethereum_address() -> Result<String, String> {
+pub async fn create_ethereum_address() -> Result<String, String> {
     let canister_state = CANISTER_STATE.with(|s| s.borrow().clone());
     if canister_state.address != "" {
         return Err("already created".to_string());
@@ -64,23 +67,20 @@ async fn create_ethereum_address() -> Result<String, String> {
 }
 
 #[ic_cdk::update]
-async fn sign_dkim_public_key(
-    chain_id: u64,
-    selector: String,
-    domain: String,
-    tag: String,
-) -> Result<SignedDkimPublicKey, String> {
-    sign_dkim_public_key_inner(chain_id, selector, domain, tag).await
-}
-
-pub(crate) async fn sign_dkim_public_key_inner(
+pub async fn sign_dkim_public_key(
     chain_id: u64,
     selector: String,
     domain: String,
     tag: String,
 ) -> Result<SignedDkimPublicKey, String> {
     let public_key = get_dkim_public_key(&selector, &domain).await?;
-    let message = tag.to_string() + public_key.as_str();
+    if tag.contains(";") {
+        return Err("tag contains ;".to_string());
+    }
+    let message = format!(
+        "selector={};domain={};tag={};public_key={};",
+        selector, domain, tag, public_key
+    );
     let signature = sign(message, chain_id).await?;
     let res = SignedDkimPublicKey {
         selector,
@@ -209,5 +209,33 @@ async fn get_dkim_public_key(selector: &str, domain: &str) -> Result<String, Str
             //Return the error as a string and end the method
             Err(message)
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+
+    use super::*;
+    use easy_hasher::easy_hasher::raw_keccak256;
+    use ethers_core::types::*;
+
+    #[test]
+    fn test_sign_dkim_public_key() {
+        // The following values are obtained by running the canister locally.
+        let selector = "20230601";
+        let domain = "gmail.com";
+        let tag = "test";
+        let public_key = "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f";
+        let expected_msg = format!(
+            "selector={};domain={};tag={};public_key={};",
+            selector, domain, tag, public_key
+        );
+        let signature = Signature::from_str("0x1f2dd623b8efb8fd9200a4550ebab8a4e45e17d10fbe5dbf9e15d193f26201d958a062d8682033226030000d740cf3534ae2ed8327401141a188231d81a6202125").unwrap();
+        let recovered = signature.recover(expected_msg).unwrap();
+        assert_eq!(
+            recovered,
+            H160::from_slice(&hex::decode("b11348be7f856fbf0f6b924cc969272cf4684cdf").unwrap())
+        );
     }
 }
