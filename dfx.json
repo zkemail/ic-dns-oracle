@@ -6,6 +6,12 @@
       "type": "rust",
       "optimize": "size"
     },
+    "poseidon": {
+      "candid": "src/poseidon/poseidon.did",
+      "package": "poseidon",
+      "type": "rust",
+      "optimize": "size"
+    },
     "ic_dns_oracle_frontend": {
       "dependencies": [
         "ic_dns_oracle_backend"

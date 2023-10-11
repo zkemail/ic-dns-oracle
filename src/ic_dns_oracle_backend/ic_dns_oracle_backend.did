@@ -1,5 +1,5 @@
-service : {
+service : (opt variant {  Development; Staging; Production; }, text) -> {
     get_ethereum_address: () -> (text);
     create_ethereum_address: () -> (variant { Ok: text; Err: text });
-    sign_dkim_public_key: (nat64, text, text, text) -> (variant { Ok: record {selector: text; domain: text; chain_id: nat64; tag: text; signature: text; public_key: text}; Err: text });
+    sign_dkim_public_key: (nat64, text, text, text) -> (variant { Ok: record {selector: text; domain: text; chain_id: nat64; tag: text; signature: text; public_key: text; public_key_hash: text }; Err: text });
 }

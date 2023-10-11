@@ -18,6 +18,9 @@ use rsa::{
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Value};
 use std::cell::RefCell;
+mod utils;
+use candid::utils::*;
+use utils::*;
 
 #[derive(Default, CandidType, Deserialize, Debug, Clone)]
 pub struct SignedDkimPublicKey {
@@ -27,12 +30,13 @@ pub struct SignedDkimPublicKey {
     pub tag: String,
     pub signature: String,
     pub public_key: String,
+    pub public_key_hash: String,
 }
 
 #[derive(Default, CandidType, Deserialize, Debug, Clone)]
 pub struct CanisterState {
     pub address: String,
-    // pub chain_id: u64,
+    pub poseidon_canister_id: String,
 }
 
 thread_local! {
@@ -40,8 +44,12 @@ thread_local! {
 }
 
 #[ic_cdk::init]
-pub async fn init(evn_opt: Option<Environment>) {
+pub async fn init(evn_opt: Option<Environment>, poseidon_canister_id: String) {
     ic_evm_sign::init(evn_opt);
+    CANISTER_STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        state.poseidon_canister_id = poseidon_canister_id;
+    });
 }
 
 #[ic_cdk::query]
@@ -74,14 +82,37 @@ pub async fn sign_dkim_public_key(
     tag: String,
 ) -> Result<SignedDkimPublicKey, String> {
     let public_key = get_dkim_public_key(&selector, &domain).await?;
+    ic_cdk::print(format!("public_key {}",public_key));
+    let canister_state = CANISTER_STATE.with(|s| s.borrow().clone());
+    if canister_state.poseidon_canister_id == "" {
+        return Err("poseidon_canister_id unknown".to_string());
+    }
+    let poseidon_canister_id = Principal::from_text(canister_state.poseidon_canister_id).unwrap();
+    // let req = PoseidonRequest {
+    //     preimage_hex: public_key.clone()
+    // };
+    let (res,): (Result<String,String>,) = ic_cdk::call(
+        poseidon_canister_id,
+        "public_key_hash",
+        (public_key.clone(),),
+    )
+    .await
+    .map_err(|(code, e)| {
+        format!(
+            "calling poseidon canister failed. code: {:?}, reason: {}",
+            code, e
+        )
+    })?;
+    let public_key_hash_hex = res?;
     if tag.contains(";") {
         return Err("tag contains ;".to_string());
     }
     let message = format!(
-        "selector={};domain={};tag={};public_key={};",
-        selector, domain, tag, public_key
+        "selector={};domain={};tag={};public_key_hash={};",
+        selector, domain, tag, public_key_hash_hex
     );
     let signature = sign(message, chain_id).await?;
+
     let res = SignedDkimPublicKey {
         selector,
         domain,
@@ -89,6 +120,7 @@ pub async fn sign_dkim_public_key(
         tag,
         signature,
         public_key,
+        public_key_hash: public_key_hash_hex,
     };
     Ok(res)
 }
@@ -119,99 +151,6 @@ async fn sign(message: String, chain_id: u64) -> Result<String, String> {
     // Ok(response.signature)
 }
 
-async fn get_dkim_public_key(selector: &str, domain: &str) -> Result<String, String> {
-    let host = "dns.google";
-    let url = format!(
-        "https://{}/resolve?name={}._domainkey.{}&type=TXT",
-        host, selector, domain
-    );
-
-    let request_headers = vec![
-        HttpHeader {
-            name: "Host".to_string(),
-            value: format!("{host}:443"),
-        },
-        HttpHeader {
-            name: "User-Agent".to_string(),
-            value: "exchange_rate_canister".to_string(),
-        },
-    ];
-
-    // let context = Context {
-    //     bucket_start_time_index: 0,
-    //     closing_price_index: 4,
-    // };
-
-    // let transform = TransformContext::new(transform, serde_json::to_vec(&context).unwrap());
-    //note "CanisterHttpRequestArgument" and "HttpMethod" are declared in line 4
-    let request = CanisterHttpRequestArgument {
-        url: url.to_string(),
-        method: HttpMethod::GET,
-        body: None,               //optional for request
-        max_response_bytes: None, //optional for request
-        transform: None,          //optional for request
-        // transform: Some(transform),
-        headers: request_headers,
-    };
-
-    //Note: in Rust, `http_request()` already sends the cycles needed
-    //so no need for explicit Cycles.add() as in Motoko
-    match http_request(request, 1_800_000_000).await {
-        //4. DECODE AND RETURN THE RESPONSE
-
-        //See:https://docs.rs/ic-cdk/latest/ic_cdk/api/management_canister/http_request/struct.HttpResponse.html
-        Ok((response,)) => {
-            if response.status != 200 {
-                // ic_cdk::api::print(format!("Received an error from coinbase: err = {:?}", raw));
-                return Err(format!(
-                    "Received an error from coinbase: err = {:?}",
-                    response.body
-                ));
-            }
-            let body_json = serde_json::from_slice::<Value>(&response.body).unwrap();
-            let data = body_json["Answer"][0]["data"].to_string();
-            let v = Regex::new("v=[A-Z0-9]+")
-                .unwrap()
-                .find(&data)
-                .expect("v= part does not exist")
-                .as_str();
-            if v != "v=DKIM1" {
-                return Err("Error: DKIM version is not DKIM1".to_string());
-            }
-            let k = Regex::new("k=[a-z]+")
-                .unwrap()
-                .find(&data)
-                .unwrap()
-                .as_str();
-            if k != "k=rsa" {
-                return Err("Error: DKIM record is not RSA key".to_string());
-            }
-            let pubkey_base64 = Regex::new("p=[A-Za-z0-9\\+/]+")
-                .unwrap()
-                .find(&data)
-                .unwrap()
-                .as_str();
-            let pubkey_pkcs = general_purpose::STANDARD
-                .decode(&pubkey_base64.to_string()[2..])
-                .expect("base64 decode failed");
-            let pubkey_bytes = RsaPublicKey::from_public_key_der(&pubkey_pkcs)
-                .map_err(|_| RsaPublicKey::from_pkcs1_der(&pubkey_pkcs))
-                .expect("Invalid DER-encoded rsa public key.");
-            let pubkey_hex = "0x".to_string() + &hex::encode(&pubkey_bytes.n().to_bytes_be());
-            // let str_body = String::from_utf8(response.body)
-            //     .expect("Transformed response is not UTF-8 encoded.");
-            Ok(pubkey_hex)
-        }
-        Err((r, m)) => {
-            let message =
-                format!("The http_request resulted into error. RejectionCode: {r:?}, Error: {m}");
-
-            //Return the error as a string and end the method
-            Err(message)
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use std::str::FromStr;
@@ -219,6 +158,7 @@ mod test {
     use super::*;
     use easy_hasher::easy_hasher::raw_keccak256;
     use ethers_core::types::*;
+    use poseidon::public_key_hash;
 
     #[test]
     fn test_sign_dkim_public_key() {
@@ -227,15 +167,17 @@ mod test {
         let domain = "gmail.com";
         let tag = "test";
         let public_key = "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f";
+        let pk_hash = "0x0ea9c777dc7110e5a9e89b13f0cfc540e3845ba120b2b6dc24024d61488d4788";
+        assert_eq!(public_key_hash(public_key.to_string()).unwrap(),pk_hash);
         let expected_msg = format!(
-            "selector={};domain={};tag={};public_key={};",
-            selector, domain, tag, public_key
+            "selector={};domain={};tag={};public_key_hash={};",
+            selector, domain, tag, pk_hash
         );
-        let signature = Signature::from_str("0x1f2dd623b8efb8fd9200a4550ebab8a4e45e17d10fbe5dbf9e15d193f26201d958a062d8682033226030000d740cf3534ae2ed8327401141a188231d81a6202125").unwrap();
+        let signature = Signature::from_str("0x27910c52929ea56c34e9b4913708e1d511864ed4ad739589fc66ec88853934fa1bed43808e2862b13652cccf4f839aee0bf33eb7a9512da544263d93309bda6526").unwrap();
         let recovered = signature.recover(expected_msg).unwrap();
         assert_eq!(
             recovered,
-            H160::from_slice(&hex::decode("b11348be7f856fbf0f6b924cc969272cf4684cdf").unwrap())
+            H160::from_slice(&hex::decode("1882ddedf1d0acc9da2cd67d4e5fa30f0ccfcd8b").unwrap())
         );
     }
 }
