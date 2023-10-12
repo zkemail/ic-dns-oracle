@@ -821,9 +821,9 @@ dependencies = [
 
 [[package]]
 name = "ic-cdk"
-version = "0.11.0"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e77fc251b01ac1beb78f288f84ab2e082d2355c93d06009f2fed0c076c920e9"
+checksum = "5e410ea21c6ac243f0bbcbf8c134c1eceaa08157fe137918f5cfa74e672c7054"
 dependencies = [
  "candid",
  "ic-cdk-macros",
@@ -849,7 +849,7 @@ dependencies = [
 [[package]]
 name = "ic-evm-sign"
 version = "0.1.4"
-source = "git+https://github.com/SoraSuegami/ic-evm-sign.git#d9fad36e059f2eb2a6f8de9541133d6fbc2350d2"
+source = "git+https://github.com/SoraSuegami/ic-evm-sign.git#92d8f9e0a452d95fd77920cb9cc441bf7adf9bbb"
 dependencies = [
  "candid",
  "easy-hasher",
@@ -865,9 +865,9 @@ dependencies = [
 
 [[package]]
 name = "ic0"
-version = "0.18.12"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16efdbe5d9b0ea368da50aedbf7640a054139569236f1a5249deb5fd9af5a5d5"
+checksum = "a54b5297861c651551676e8c43df805dad175cc33bc97dbd992edbbb85dcbcdf"
 
 [[package]]
 name = "ic_dns_oracle_backend"
@@ -1372,9 +1372,9 @@ dependencies = [
 
 [[package]]
 name = "primitive-types"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f3486ccba82358b11a77516035647c34ba167dfa53312630de83b12bd4f3d66"
+checksum = "0b34d9fd68ae0b74a41b21c03c2f62847aa0ffea044eee893b4c140b37e244e2"
 dependencies = [
  "fixed-hash",
  "impl-codec",
@@ -1515,9 +1515,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3cbb081b9784b07cceb8824c8583f86db4814d172ab043f3c23f7dc600bf83d"
+checksum = "56d84fdd47036b038fc80dd333d10b6aab10d5d31f4a366e20014def75328d33"
 
 [[package]]
 name = "rfc6979"

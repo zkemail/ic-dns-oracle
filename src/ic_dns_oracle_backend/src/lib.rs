@@ -82,7 +82,7 @@ pub async fn sign_dkim_public_key(
     tag: String,
 ) -> Result<SignedDkimPublicKey, String> {
     let public_key = get_dkim_public_key(&selector, &domain).await?;
-    ic_cdk::print(format!("public_key {}",public_key));
+    ic_cdk::print(format!("public_key {}", public_key));
     let canister_state = CANISTER_STATE.with(|s| s.borrow().clone());
     if canister_state.poseidon_canister_id == "" {
         return Err("poseidon_canister_id unknown".to_string());
@@ -91,7 +91,7 @@ pub async fn sign_dkim_public_key(
     // let req = PoseidonRequest {
     //     preimage_hex: public_key.clone()
     // };
-    let (res,): (Result<String,String>,) = ic_cdk::call(
+    let (res,): (Result<String, String>,) = ic_cdk::call(
         poseidon_canister_id,
         "public_key_hash",
         (public_key.clone(),),
@@ -108,10 +108,10 @@ pub async fn sign_dkim_public_key(
         return Err("tag contains ;".to_string());
     }
     let message = format!(
-        "selector={};domain={};tag={};public_key_hash={};",
-        selector, domain, tag, public_key_hash_hex
+        "chain_id={};selector={};domain={};tag={};public_key_hash={};",
+        chain_id, selector, domain, tag, public_key_hash_hex
     );
-    let signature = sign(message, chain_id).await?;
+    let signature = sign(message).await?;
 
     let res = SignedDkimPublicKey {
         selector,
@@ -125,13 +125,9 @@ pub async fn sign_dkim_public_key(
     Ok(res)
 }
 
-async fn sign(message: String, chain_id: u64) -> Result<String, String> {
-    let signature = ic_evm_sign::sign_msg(
-        message.as_bytes().to_vec(),
-        chain_id,
-        Principal::anonymous(),
-    )
-    .await?;
+async fn sign(message: String) -> Result<String, String> {
+    let signature =
+        ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
     Ok(signature)
     // let request = SignWithECDSARequest {
     //     message_hash: sha256(&message).to_vec(),
@@ -158,6 +154,7 @@ mod test {
     use super::*;
     use easy_hasher::easy_hasher::raw_keccak256;
     use ethers_core::types::*;
+    use hex;
     use poseidon::public_key_hash;
 
     #[test]
@@ -168,12 +165,21 @@ mod test {
         let tag = "test";
         let public_key = "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f";
         let pk_hash = "0x0ea9c777dc7110e5a9e89b13f0cfc540e3845ba120b2b6dc24024d61488d4788";
-        assert_eq!(public_key_hash(public_key.to_string()).unwrap(),pk_hash);
+        assert_eq!(public_key_hash(public_key.to_string()).unwrap(), pk_hash);
         let expected_msg = format!(
-            "selector={};domain={};tag={};public_key_hash={};",
-            selector, domain, tag, pk_hash
+            "chain_id={};selector={};domain={};tag={};public_key_hash={};",
+            1, selector, domain, tag, pk_hash
         );
-        let signature = Signature::from_str("0x27910c52929ea56c34e9b4913708e1d511864ed4ad739589fc66ec88853934fa1bed43808e2862b13652cccf4f839aee0bf33eb7a9512da544263d93309bda6526").unwrap();
+        println!("expected_msg {}", expected_msg);
+        let len = expected_msg.len();
+        let len_string = len.to_string();
+        const PREFIX: &str = "\x19Ethereum Signed Message:\n";
+        let mut eth_message = Vec::with_capacity(PREFIX.len() + len_string.len() + len);
+        eth_message.extend_from_slice(PREFIX.as_bytes());
+        eth_message.extend_from_slice(len_string.as_bytes());
+        eth_message.extend_from_slice(&expected_msg.as_bytes());
+        println!("hash {}", hex::encode(raw_keccak256(eth_message).to_vec()));
+        let signature = Signature::from_str("0xcb313f04debf0c801ade29c3a999e3a1db11e0d78a0108c5e684ede931d2968b5ee01d121796d50361a5da38e2f432547c06aedc11cd485c3bbd5030edcf4a951b").unwrap();
         let recovered = signature.recover(expected_msg).unwrap();
         assert_eq!(
             recovered,
