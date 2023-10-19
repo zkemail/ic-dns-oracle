@@ -159,13 +159,19 @@ pub async fn sign_dkim_public_key(
 
     let res = SignedDkimPublicKey {
         selector,
-        domain,
+        domain: domain.clone(),
         chain_id: canister_state.chain_id,
         nonce: domain_state.nonce,
         signature,
         public_key,
         public_key_hash: public_key_hash_hex,
     };
+    CANISTER_STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        let domain_states = state.domain_states.get_mut(&domain).unwrap();
+        domain_states.nonce += 1;
+        domain_states.previous_responses.push(res.clone());
+    });
     Ok(res)
 }
 
