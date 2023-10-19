@@ -1,5 +1,16 @@
-service : (opt variant {  Development; Staging; Production; }, text) -> {
-    get_ethereum_address: () -> (text);
+type SignedDkimPublicKey =
+    record {
+        selector: text;
+        domain: text;
+        chain_id: nat64;
+        nonce: nat64;
+        signature: text;
+        public_key: text;
+        public_key_hash: text;
+    };
+service : (opt variant {  Development; Staging; Production; }, text, nat64, vec text) -> {
+    get_ethereum_address: () -> (text) query;
+    get_previous_response: (text, nat64) -> (variant { Ok: SignedDkimPublicKey; Err: text }) query;
     create_ethereum_address: () -> (variant { Ok: text; Err: text });
-    sign_dkim_public_key: (nat64, text, text, text) -> (variant { Ok: record {selector: text; domain: text; chain_id: nat64; tag: text; signature: text; public_key: text; public_key_hash: text }; Err: text });
+    sign_dkim_public_key: (text, text) -> (variant { Ok: SignedDkimPublicKey; Err: text });
 }
