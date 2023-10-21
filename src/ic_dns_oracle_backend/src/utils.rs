@@ -1,4 +1,5 @@
 use base64::{engine::general_purpose, Engine as _};
+use candid::Principal;
 use ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
 };
@@ -7,6 +8,13 @@ use rsa::{
     pkcs1::DecodeRsaPublicKey, pkcs8::DecodePublicKey, traits::PublicKeyParts, RsaPublicKey,
 };
 use serde_json::{self, Value};
+
+pub(crate) async fn create_ethereum_address() -> Result<String, String> {
+    let res = ic_evm_sign::create_address(Principal::anonymous())
+        .await
+        .expect("create_address failed");
+    Ok(res.address)
+}
 
 pub(crate) async fn get_dkim_public_key(selector: &str, domain: &str) -> Result<String, String> {
     let host = "dns.google";

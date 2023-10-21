@@ -18,6 +18,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
 
 [[package]]
+name = "arc-swap"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bddcadddf5e9015d310179a59bb28c4d4b9920ad0f11e8e14dbadf654890c9a6"
+
+[[package]]
 name = "arrayref"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -491,6 +497,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_logger"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85cdab6a89accf66733ad5a1693a4dcced6aeff64602b634530dd73c1f3ee9f0"
+dependencies = [
+ "humantime",
+ "is-terminal",
+ "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -805,6 +824,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
+name = "hermit-abi"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d77f7ec81a6d05a3abb01ab6eb7590f6083d08449fe5a1c8b1e620283546ccb7"
+
+[[package]]
 name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -818,6 +843,12 @@ checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest 0.10.7",
 ]
+
+[[package]]
+name = "humantime"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "ic-cdk"
@@ -847,6 +878,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-cdk-timers"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96fa62243d3a412ceae88d6ad213614769e8b0bbcaeb98abb2e7985074257356"
+dependencies = [
+ "futures",
+ "ic-cdk",
+ "ic0",
+ "serde",
+ "serde_bytes",
+ "slotmap",
+]
+
+[[package]]
+name = "ic-crypto-getrandom-for-wasm"
+version = "0.7.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk.git#a4e9a063be5b94912406a40c3706683cb77b2547"
+dependencies = [
+ "getrandom",
+]
+
+[[package]]
 name = "ic-evm-sign"
 version = "0.1.4"
 source = "git+https://github.com/SoraSuegami/ic-evm-sign.git#92d8f9e0a452d95fd77920cb9cc441bf7adf9bbb"
@@ -861,6 +914,70 @@ dependencies = [
  "libsecp256k1",
  "primitive-types",
  "serde",
+]
+
+[[package]]
+name = "ic-exports"
+version = "0.7.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk.git#a4e9a063be5b94912406a40c3706683cb77b2547"
+dependencies = [
+ "candid",
+ "ic-cdk",
+ "ic-cdk-macros",
+ "ic-cdk-timers",
+ "ic-crypto-getrandom-for-wasm",
+ "ic-kit",
+ "serde",
+]
+
+[[package]]
+name = "ic-kit"
+version = "0.7.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk.git#a4e9a063be5b94912406a40c3706683cb77b2547"
+dependencies = [
+ "candid",
+ "futures",
+ "ic-cdk",
+ "ic-cdk-macros",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "ic-log"
+version = "0.7.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk.git#a4e9a063be5b94912406a40c3706683cb77b2547"
+dependencies = [
+ "anyhow",
+ "arc-swap",
+ "candid",
+ "env_logger",
+ "humantime",
+ "ic-exports",
+ "log",
+ "ringbuffer",
+ "serde",
+]
+
+[[package]]
+name = "ic-storage"
+version = "0.7.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk.git#a4e9a063be5b94912406a40c3706683cb77b2547"
+dependencies = [
+ "candid",
+ "ic-exports",
+ "ic-storage-derive",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "ic-storage-derive"
+version = "0.7.0"
+source = "git+https://github.com/bitfinity-network/canister-sdk.git#a4e9a063be5b94912406a40c3706683cb77b2547"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -880,6 +997,10 @@ dependencies = [
  "hex",
  "ic-cdk",
  "ic-evm-sign",
+ "ic-exports",
+ "ic-log",
+ "ic-storage",
+ "log",
  "poseidon",
  "regex",
  "rsa",
@@ -935,6 +1056,17 @@ checksum = "8adf3ddd720272c6ea8bf59463c04e0f93d0bbf7c5439b691bca2987e0270897"
 dependencies = [
  "equivalent",
  "hashbrown",
+]
+
+[[package]]
+name = "is-terminal"
+version = "0.4.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb0889898416213fab133e1d33a0e5858a48177452750691bde3666d0fdbaf8b"
+dependencies = [
+ "hermit-abi",
+ "rustix",
+ "windows-sys",
 ]
 
 [[package]]
@@ -1050,6 +1182,12 @@ name = "linux-raw-sys"
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da2479e8c062e40bf0066ffa0bc823de0a9368974af99c9f6df941d2c231e03f"
+
+[[package]]
+name = "log"
+version = "0.4.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
 name = "maybe-rayon"
@@ -1530,6 +1668,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ringbuffer"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3df6368f71f205ff9c33c076d170dd56ebf68e8161c733c0caa07a7a5509ed53"
+
+[[package]]
 name = "rlp"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1784,6 +1928,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "slotmap"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1e08e261d0e8f5c43123b7adf3e4ca1690d655377ac93a03b2c9d3e98de1342"
+dependencies = [
+ "version_check",
 ]
 
 [[package]]
