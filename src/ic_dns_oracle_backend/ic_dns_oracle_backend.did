@@ -8,9 +8,10 @@ type SignedDkimPublicKey =
         public_key: text;
         public_key_hash: text;
     };
-service : (opt variant {  Development; Staging; Production; }, text, nat64, vec text) -> {
+service : (opt variant {  Development; Staging; Production; }, nat64, vec text) -> {
     get_ethereum_address: () -> (text) query;
+    get_log_records: (nat64) -> (vec text) query;
     get_previous_response: (text) -> (variant { Ok: SignedDkimPublicKey; Err: text }) query;
-    create_ethereum_address: () -> (variant { Ok: text; Err: text });
+    create_poseidon_canister: () -> (text);
     sign_dkim_public_key: (text, text) -> (variant { Ok: SignedDkimPublicKey; Err: text });
 }

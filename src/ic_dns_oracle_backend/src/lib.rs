@@ -22,9 +22,11 @@ use serde_json::{self, Value};
 use std::{cell::RefCell, collections::HashMap};
 mod utils;
 use candid::utils::*;
+use ic_cdk::api::management_canister::main::*;
 use ic_exports::*;
 use ic_log::{init_log, LogSettings, LoggerConfig};
 use log::{debug, error, info};
+use serde_bytes;
 use utils::*;
 
 #[derive(Default, CandidType, Deserialize, Debug, Clone)]
@@ -43,6 +45,9 @@ pub struct CanisterState {
     pub address: String,
     pub poseidon_canister_id: String,
     pub chain_id: u64,
+    pub http_cycles: u128,
+    pub poseidon_cycles: u128,
+    pub fee_cycles: u128,
     pub domain_states: HashMap<String, DomainState>,
 }
 
@@ -52,21 +57,20 @@ pub struct DomainState {
     pub previous_response: Option<SignedDkimPublicKey>,
 }
 
-// thread_local! {
-//     pub static CANISTER_STATE: RefCell<CanisterState> = RefCell::new(CanisterState::default());
-// }
-
 #[ic_cdk::init]
-pub async fn init(
-    evn_opt: Option<Environment>,
-    poseidon_canister_id: String,
-    chain_id: u64,
-    domains: Vec<String>,
-) {
-    ic_evm_sign::init(evn_opt);
-    Principal::from_text(poseidon_canister_id.clone()).unwrap();
+pub async fn init(evn_opt: Option<Environment>, chain_id: u64, domains: Vec<String>) {
+    ic_evm_sign::init(evn_opt.clone());
+    // let wasm_module = serde_bytes::ByteBuf::from(wasm_args.wasm_module);
+    // let install_arg = InstallCodeArgument {
+    //     mode: CanisterInstallMode::Install,
+    //     canister_id: Principal::from_text(poseidon_canister_id.clone()).unwrap(),
+    //     wasm_module: wasm_bytes,
+    //     arg: vec![],
+    // };
+    // install_code(install_arg)
+    //     .await
+    //     .expect("fail to install the code to poseidon canister");
     let state = CanisterState::get();
-    state.borrow_mut().poseidon_canister_id = poseidon_canister_id;
     state.borrow_mut().chain_id = chain_id;
     for domain in domains {
         state
@@ -74,6 +78,18 @@ pub async fn init(
             .domain_states
             .insert(domain, DomainState::default());
     }
+    let http_cycles: u128 = match evn_opt {
+        Some(Environment::Development) => 3_600_000_000,
+        Some(Environment::Staging) => 40_000_000_000,
+        Some(Environment::Production) => 40_000_000_000,
+        None => {
+            panic!("evn None");
+        }
+    };
+    state.borrow_mut().http_cycles = http_cycles;
+    state.borrow_mut().poseidon_cycles = 20_000_000;
+    let sign_cycles = ic_evm_sign::state::STATE.with(|s| s.borrow().config.sign_cycles) as u128;
+    state.borrow_mut().fee_cycles = http_cycles + 20_000_000 + sign_cycles;
     let settings = LogSettings {
         in_memory_records: Some(128),
         log_filter: Some("info".to_string()),
@@ -91,10 +107,7 @@ pub async fn get_ethereum_address() -> String {
 }
 
 #[ic_cdk::query]
-pub async fn get_previous_response(
-    domain: String,
-    // nonce: u64,
-) -> Result<SignedDkimPublicKey, String> {
+pub async fn get_previous_response(domain: String) -> Result<SignedDkimPublicKey, String> {
     let canister_state = CanisterState::get();
     info!("state {:?}", canister_state.clone());
     let canister_state = canister_state.borrow();
@@ -102,47 +115,92 @@ pub async fn get_previous_response(
         Some(s) => s,
         None => return Err(format!("domain {} not found", domain).to_string()),
     };
-    // if nonce >= domain_state.nonce {
-    //     return Err(format!("nonce {} too large", nonce).to_string());
-    // }
     match domain_state.previous_response.as_ref() {
         Some(s) => Ok(s.clone()),
         None => Err("previous_respons not found".to_string()),
     }
 }
 
-// #[ic_cdk::update]
-// pub async fn create_ethereum_address() -> Result<String, String> {
-//     let canister_state = CANISTER_STATE.with(|s| s.borrow().clone());
-//     if canister_state.address != "" {
-//         return Err("already created".to_string());
-//     }
-//     let res = ic_evm_sign::create_address(Principal::anonymous())
-//         .await
-//         .expect("create_address failed");
-//     CANISTER_STATE.with(|s| {
-//         let mut state = s.borrow_mut();
-//         state.address = res.address.clone();
-//     });
-//     Ok(res.address)
-// }
+#[ic_cdk::query]
+pub fn get_log_records(count: usize) -> Vec<String> {
+    debug!("collecting {count} log records");
+    ic_log::take_memory_records(count)
+}
+
+#[ic_cdk::inspect_message]
+fn inspect_message() {
+    match ic_cdk::api::call::method_name().as_str() {
+        "create_poseidon_canister" => {
+            if ic_cdk::api::is_controller(&ic_cdk::caller()) {
+                ic_cdk::api::call::accept_message();
+                return;
+            } else {
+                ic_cdk::api::call::reject_message();
+                panic!("call not from controller is not allowed");
+            }
+        }
+        "sign_dkim_public_key" => {
+            if ic_cdk::caller() != Principal::anonymous() {
+                ic_cdk::api::call::accept_message();
+                return;
+            } else {
+                ic_cdk::api::call::reject_message();
+                panic!("call from anonymous is not allowed");
+            }
+        }
+        _ => {
+            ic_cdk::api::call::reject_message();
+            panic!("not allowed method");
+        }
+    };
+}
+
+#[ic_cdk::update]
+pub async fn create_poseidon_canister() -> String {
+    let state = CanisterState::get();
+    if state.borrow().poseidon_canister_id != "" {
+        return state.borrow().poseidon_canister_id.clone();
+    }
+    let canister_setting = CanisterSettings {
+        controllers: Some(vec![ic_cdk::caller(), ic_cdk::api::id()]),
+        compute_allocation: None,
+        memory_allocation: None,
+        freezing_threshold: None,
+    };
+    let create_arg = CreateCanisterArgument {
+        settings: Some(canister_setting),
+    };
+    let (create_res,) = create_canister(create_arg, 261_538_461_538)
+        .await
+        .expect("fail to create poseidon canister");
+    let poseidon_canister_id = create_res.canister_id.to_text();
+    info!("poseidon_canister_id {}", poseidon_canister_id);
+    state.borrow_mut().poseidon_canister_id = poseidon_canister_id.clone();
+    poseidon_canister_id
+}
 
 #[ic_cdk::update]
 pub async fn sign_dkim_public_key(
     selector: String,
     domain: String,
 ) -> Result<SignedDkimPublicKey, String> {
-    info!("cycle {}", ic_cdk::api::call::msg_cycles_available128());
+    let available_cycles = ic_cdk::api::call::msg_cycles_available128();
+    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(available_cycles);
+    if available_cycles != accepted_cycles {
+        return Err("not all of the available_cycles is moved".to_string());
+    }
+    info!("available_cycles {}", available_cycles);
     let canister_state = CanisterState::get();
     info!("state {:?}", canister_state.clone());
     let mut canister_state = canister_state.borrow_mut();
-    // let mut canister_state = CANISTER_STATE.with(|s| s.borrow().clone());
+    if available_cycles < canister_state.fee_cycles {
+        return Err("not enough cycles".to_string());
+    }
     if canister_state.address == "" {
         let address = create_ethereum_address().await?;
-        // let canister_state = CanisterState::get();
         canister_state.address = address.clone();
     }
-    let public_key = get_dkim_public_key(&selector, &domain).await?;
+    let public_key = get_dkim_public_key(&selector, &domain, canister_state.http_cycles).await?;
     info!("public_key {}", public_key);
     if canister_state.poseidon_canister_id == "" {
         return Err("poseidon_canister_id unknown".to_string());
@@ -154,10 +212,11 @@ pub async fn sign_dkim_public_key(
     let poseidon_canister_id =
         Principal::from_text(canister_state.poseidon_canister_id.clone()).unwrap();
     info!("cycle {}", ic_cdk::api::call::msg_cycles_available128());
-    let (res,): (Result<String, String>,) = ic_cdk::call(
+    let (res,): (Result<String, String>,) = ic_cdk::api::call::call_with_payment128(
         poseidon_canister_id,
         "public_key_hash",
         (public_key.clone(),),
+        canister_state.poseidon_cycles,
     )
     .await
     .map_err(|(code, e)| {
@@ -188,12 +247,6 @@ pub async fn sign_dkim_public_key(
     };
     let mut domain_state = canister_state.domain_states.get_mut(&domain).unwrap();
     domain_state.previous_response = Some(res.clone());
-    // CANISTER_STATE.with(|s| {
-    //     let mut state = s.borrow_mut();
-    //     let domain_states = state.domain_states.get_mut(&domain).unwrap();
-    //     domain_states.nonce += 1;
-    //     domain_states.previous_responses.push(res.clone());
-    // });
     info!("cycle {}", ic_cdk::api::call::msg_cycles_available128());
     Ok(res)
 }
@@ -202,22 +255,6 @@ async fn sign(message: String) -> Result<String, String> {
     let signature =
         ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
     Ok(signature)
-    // let request = SignWithECDSARequest {
-    //     message_hash: sha256(&message).to_vec(),
-    //     derivation_path: vec![],
-    //     key_id: EcdsaKeyIds::TestKeyLocalDevelopment.to_key_id(),
-    // };
-
-    // let (response,): (SignWithECDSAReply,) = ic_cdk::api::call::call_with_payment(
-    //     mgmt_canister_id(),
-    //     "sign_with_ecdsa",
-    //     (request,),
-    //     25_000_000_000,
-    // )
-    // .await
-    // .map_err(|e| format!("sign_with_ecdsa failed {}", e.1))?;
-
-    // Ok(response.signature)
 }
 
 #[cfg(test)]
