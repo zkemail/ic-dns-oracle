@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose, Engine as _};
-use candid::Principal;
+use candid::{Nat, Principal};
 use ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse, TransformArgs,
     TransformContext,
@@ -121,48 +121,43 @@ fn transform(raw: TransformArgs) -> HttpResponse {
         };
     }
     let body_json = serde_json::from_slice::<Value>(&raw.response.body).unwrap();
-    let data = body_json["Answer"][0]["data"].to_string();
-    let v = Regex::new("v=[A-Z0-9]+")
-        .unwrap()
-        .find(&data)
-        .expect("v= part does not exist")
-        .as_str();
-    if v != "v=DKIM1" {
-        return HttpResponse {
-            status: raw.response.status.clone(),
-            body: b"invalid v parameter".to_vec(),
-            headers,
-            ..Default::default()
-        };
-    }
-    let k = Regex::new("k=[a-z]+")
-        .unwrap()
-        .find(&data)
-        .unwrap()
-        .as_str();
-    if k != "k=rsa" {
-        return HttpResponse {
-            status: raw.response.status.clone(),
-            body: b"DKIM record is not RSA key".to_vec(),
-            headers,
-            ..Default::default()
-        };
-    }
-    let pubkey_base64 = Regex::new("p=[A-Za-z0-9\\+/]+")
-        .unwrap()
-        .find(&data)
-        .unwrap()
-        .as_str();
-    let pubkey_pkcs = general_purpose::STANDARD
-        .decode(&pubkey_base64.to_string()[2..])
-        .expect("base64 decode failed");
-    let pubkey_bytes = RsaPublicKey::from_public_key_der(&pubkey_pkcs)
-        .map_err(|_| RsaPublicKey::from_pkcs1_der(&pubkey_pkcs))
-        .expect("Invalid DER-encoded rsa public key.");
+    let answers: Vec<Value> = body_json["Answer"]
+        .as_array()
+        .expect("No array of Answer")
+        .to_vec();
+    for i in 0..answers.len() {
+        let data = answers[i]["data"].to_string();
+        let k = Regex::new("k=[a-z]+").unwrap().find(&data);
+        match k {
+            None => continue,
+            Some(k) => {
+                if k.as_str() != "k=rsa" {
+                    continue;
+                }
+            }
+        }
+        let pubkey_base64 = Regex::new("p=[A-Za-z0-9\\+/]+")
+            .unwrap()
+            .find(&data)
+            .unwrap()
+            .as_str();
+        let pubkey_pkcs = general_purpose::STANDARD
+            .decode(&pubkey_base64.to_string()[2..])
+            .expect("base64 decode failed");
+        let pubkey_bytes = RsaPublicKey::from_public_key_der(&pubkey_pkcs)
+            .map_err(|_| RsaPublicKey::from_pkcs1_der(&pubkey_pkcs))
+            .expect("Invalid DER-encoded rsa public key.");
 
+        return HttpResponse {
+            status: raw.response.status.clone(),
+            body: pubkey_bytes.n().to_bytes_be(),
+            headers,
+            ..Default::default()
+        };
+    }
     HttpResponse {
-        status: raw.response.status.clone(),
-        body: pubkey_bytes.n().to_bytes_be(),
+        status: Nat::from(400),
+        body: b"No key found".to_vec(),
         headers,
         ..Default::default()
     }

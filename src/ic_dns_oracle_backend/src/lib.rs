@@ -73,7 +73,7 @@ pub struct DomainState {
 }
 
 #[ic_cdk::init]
-pub async fn init(evn_opt: Option<Environment>, chain_id: u64, domains: Vec<String>) {
+pub fn init(evn_opt: Option<Environment>, chain_id: u64, domains: Vec<String>) {
     ic_evm_sign::init(evn_opt.clone());
     // let wasm_module = serde_bytes::ByteBuf::from(wasm_args.wasm_module);
     // let install_arg = InstallCodeArgument {
@@ -115,14 +115,14 @@ pub async fn init(evn_opt: Option<Environment>, chain_id: u64, domains: Vec<Stri
 }
 
 #[ic_cdk::query]
-pub async fn get_ethereum_address() -> String {
+pub fn get_ethereum_address() -> String {
     let state = CanisterState::get();
     info!("state {:?}", state.clone());
     state.clone().borrow().address.clone()
 }
 
 #[ic_cdk::query]
-pub async fn get_previous_response(domain: String) -> Result<SignedDkimPublicKey, String> {
+pub fn get_previous_response(domain: String) -> Result<SignedDkimPublicKey, String> {
     let canister_state = CanisterState::get();
     info!("state {:?}", canister_state.clone());
     let canister_state = canister_state.borrow();
@@ -134,6 +134,14 @@ pub async fn get_previous_response(domain: String) -> Result<SignedDkimPublicKey
         Some(s) => Ok(s.clone()),
         None => Err("previous_respons not found".to_string()),
     }
+}
+
+#[ic_cdk::query]
+pub fn get_supported_domains() -> Vec<String> {
+    let canister_state = CanisterState::get();
+    info!("state {:?}", canister_state.clone());
+    let canister_state = canister_state.borrow();
+    canister_state.domain_states.keys().cloned().collect()
 }
 
 #[ic_cdk::query]

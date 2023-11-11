@@ -21,6 +21,7 @@ service : (opt variant {  Development; Staging; Production; }, nat64, vec text) 
     get_ethereum_address: () -> (text) query;
     get_log_records: (nat64) -> (vec text) query;
     get_previous_response: (text) -> (variant { Ok: SignedDkimPublicKey; Err: text }) query;
+    get_supported_domains: () -> (vec text) query;
     create_poseidon_canister: () -> (text);
     sign_dkim_public_key: (text, text) -> (variant { Ok: SignedDkimPublicKey; Err: text });
     revoke_dkim_public_key: (text, text, text) -> (variant { Ok: SignedRevocation; Err: text });
