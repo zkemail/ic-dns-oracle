@@ -17,7 +17,7 @@ type SignedRevocation =
         public_key_hash: text;
         private_key: text;
     };
-service : (opt variant {  Development; Staging; Production; }, nat64, vec text) -> {
+service : (opt variant {  Development; Staging; Production; }, nat64) -> {
     get_ethereum_address: () -> (text) query;
     get_log_records: (nat64) -> (vec text) query;
     get_previous_response: (text) -> (variant { Ok: SignedDkimPublicKey; Err: text }) query;
