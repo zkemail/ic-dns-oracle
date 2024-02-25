@@ -1,5 +1,5 @@
 [workspace]
-members = ["src/ic_dns_oracle_backend", "src/poseidon"]
+members = ["src/ic_dns_oracle_backend", "src/poseidon", "src/dns_client"]
 
 # [patch.crates-io]
 # ic-cdk2 = { version = "0.7" }

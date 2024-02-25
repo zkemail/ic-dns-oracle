@@ -1,0 +1,3 @@
+service : {
+    get_dkim_public_key: (text, text, nat64) -> (variant { Ok: text; Err: text });
+}

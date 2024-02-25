@@ -2,7 +2,6 @@ type SignedDkimPublicKey =
     record {
         selector: text;
         domain: text;
-        chain_id: nat64;
         signature: text;
         public_key: text;
         public_key_hash: text;
@@ -11,18 +10,13 @@ type SignedRevocation =
     record {
         selector: text;
         domain: text;
-        chain_id: nat64;
         signature: text;
         public_key: text;
         public_key_hash: text;
         private_key: text;
     };
-service : (opt variant {  Development; Staging; Production; }, nat64) -> {
+service : (opt variant {  Development; Staging; Production; }, text, text) -> {
     get_ethereum_address: () -> (text) query;
-    get_log_records: (nat64) -> (vec text) query;
-    get_previous_response: (text) -> (variant { Ok: SignedDkimPublicKey; Err: text }) query;
-    get_supported_domains: () -> (vec text) query;
-    create_poseidon_canister: () -> (text);
     sign_dkim_public_key: (text, text) -> (variant { Ok: SignedDkimPublicKey; Err: text });
     revoke_dkim_public_key: (text, text, text) -> (variant { Ok: SignedRevocation; Err: text });
 }

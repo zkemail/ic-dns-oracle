@@ -12,6 +12,12 @@
       "type": "rust",
       "optimize": "size"
     },
+    "dns_client": {
+      "candid": "src/dns_client/dns_client.did",
+      "package": "dns_client",
+      "type": "rust",
+      "optimize": "size"
+    },
     "ic_dns_oracle_frontend": {
       "dependencies": [
         "ic_dns_oracle_backend"
