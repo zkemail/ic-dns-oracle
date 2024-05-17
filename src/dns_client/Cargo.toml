@@ -20,7 +20,7 @@ hex = { version = "0.4.3", default-features = false }
 rsa = { version = "0.9.2", default-features = false }
 # sha2 = { version = "0.10.6", default-features = false }
 ic-evm-sign = { version = "0.1.4", git = "https://github.com/SoraSuegami/ic-evm-sign.git" }
-ic-storage = { version = "0.13.0", git = "https://github.com/bitfinity-network/canister-sdk.git" }
+# ic-storage = { version = "0.13.0", git = "https://github.com/bitfinity-network/canister-sdk.git" }
 # ic-exports = { version = "0.7.0", git = "https://github.com/bitfinity-network/canister-sdk.git" }
 # ic-log = { version = "0.7.0", git = "https://github.com/bitfinity-network/canister-sdk.git" }
 # log = "0.4.20"

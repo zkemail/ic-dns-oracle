@@ -1,6 +1,6 @@
 // use base64::{engine::general_purpose, Engine as _};
 use candid::{Nat, Principal};
-use ic_cdk::api::management_canister::http_request::{
+use ic_exports::ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse, TransformArgs,
     TransformContext,
 };
