@@ -83,10 +83,9 @@ pub async fn get_dkim_public_key(
 fn transform(raw: TransformArgs) -> HttpResponse {
     match _transform(raw) {
         Ok(res) => res,
-        Err(e) => panic!("{}",e)
+        Err(e) => panic!("{}", e),
     }
 }
-
 
 fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
     let headers = vec![
@@ -117,7 +116,10 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
     ];
 
     if raw.response.status != Nat::from(200u64) {
-        return Err(format!("Received an error with code {} from google dns: err = {:?}", raw.response.status, raw.response.body));
+        return Err(format!(
+            "Received an error with code {} from google dns: err = {:?}",
+            raw.response.status, raw.response.body
+        ));
     }
     let body_json = serde_json::from_slice::<Value>(&raw.response.body).unwrap();
     let answers: Vec<Value> = body_json["Answer"]
@@ -126,34 +128,34 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
         .to_vec();
     for i in 0..answers.len() {
         let data = answers[i]["data"].to_string();
-        let k = Regex::new("k=[a-z]+").unwrap().find(&data);
-        match k {
-            None => continue,
-            Some(k) => {
-                if k.as_str() != "k=rsa" {
-                    continue;
-                }
+        if let Some(k) = Regex::new("k=[a-z]+").unwrap().find(&data) {
+            if k.as_str() != "k=rsa" {
+                continue;
             }
         }
-        let pubkey_base64 = Regex::new("p=[A-Za-z0-9\\+/]+")
-            .unwrap()
-            .find(&data)
-            .ok_or_else(|| format!("No base64 pubkey found in {}", data))?
-            .as_str();
-        let pubkey_pkcs = general_purpose::STANDARD
-            .decode(&pubkey_base64.to_string()[2..])
-            .map_err(|e| format!("base64 decode of {} failed: {}", pubkey_base64,e.to_string()))?;
-        let pubkey_bytes = match RsaPublicKey::from_public_key_der(&pubkey_pkcs) {
-            Ok(pubkey) => pubkey,
-            Err(_) => RsaPublicKey::from_pkcs1_der(&pubkey_pkcs).map_err(|e| format!("Invalid encoded rsa public key: {}", e.to_string()))?,
-        };
-        return Ok(HttpResponse {
-            status: raw.response.status.clone(),
-            body: pubkey_bytes.n().to_bytes_be(),
-            headers,
-            ..Default::default()
-        });
+        if let Some(pubkey_base64) = Regex::new("p=[A-Za-z0-9\\+/]+").unwrap().find(&data) {
+            let pubkey_base64 = pubkey_base64.as_str();
+            let pubkey_pkcs = general_purpose::STANDARD
+                .decode(&pubkey_base64.to_string()[2..])
+                .map_err(|e| {
+                    format!(
+                        "base64 decode of {} failed: {}",
+                        pubkey_base64,
+                        e.to_string()
+                    )
+                })?;
+            let pubkey_bytes = match RsaPublicKey::from_public_key_der(&pubkey_pkcs) {
+                Ok(pubkey) => pubkey,
+                Err(_) => RsaPublicKey::from_pkcs1_der(&pubkey_pkcs)
+                    .map_err(|e| format!("Invalid encoded rsa public key: {}", e.to_string()))?,
+            };
+            return Ok(HttpResponse {
+                status: raw.response.status.clone(),
+                body: pubkey_bytes.n().to_bytes_be(),
+                headers,
+                ..Default::default()
+            });
+        }
     }
     Err("No key found".to_string())
 }
-
