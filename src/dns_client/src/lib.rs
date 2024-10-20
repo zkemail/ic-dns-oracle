@@ -45,8 +45,8 @@ pub async fn get_dkim_public_key(
     let request = CanisterHttpRequestArgument {
         url: url.to_string(),
         method: HttpMethod::GET,
-        body: None,               //optional for request
-        max_response_bytes: None, //optional for request
+        body: None,                      //optional for request
+        max_response_bytes: Some(65536), // 64KB
         // transform: None,          //optional for request
         transform: Some(transform),
         headers: request_headers,
