@@ -17,7 +17,7 @@ type SignedRevocation =
     };
 service : (opt variant {  Development; Staging; Production; }, text, text) -> {
     pre_upgrade_function: () -> ();
-    post_upgrade_function: (text, text) -> ();
+    post_upgrade_function: (opt variant {  Development; Staging; Production; }, text, text) -> ();
     get_ethereum_address: () -> (text) query;
     get_poseidon_canister_id: () -> (text) query;
     get_dns_client_canister_id: () -> (text) query;

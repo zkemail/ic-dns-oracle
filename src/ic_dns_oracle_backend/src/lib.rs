@@ -84,7 +84,11 @@ pub fn pre_upgrade_function() {
 }
 
 #[ic_cdk::post_upgrade]
-pub fn post_upgrade_function(poseidon_canister_id: String, dns_client_canister_id: String) {
+pub fn post_upgrade_function(
+    evn_opt: Option<Environment>,
+    poseidon_canister_id: String,
+    dns_client_canister_id: String,
+) {
     ic_evm_sign::post_upgrade();
     CONFIG.with(|config| {
         config.borrow_mut().insert(1, poseidon_canister_id.clone());
@@ -128,15 +132,15 @@ pub fn get_dns_client_canister_id() -> String {
 }
 
 #[ic_cdk::query]
-pub fn read_log_from_first(num_log: u64) -> Result<Vec<String>, String> {
+pub fn read_log_from_first(num_log: u64) -> Vec<String> {
     let mut logs = Vec::with_capacity(num_log as usize);
     let log_len = LOG.with(|log| log.borrow().len());
-    if num_log > log_len {
-        return Err(format!(
-            "num_log {} is greater than log length {}",
-            num_log, log_len
-        ));
-    }
+    assert!(
+        num_log <= log_len,
+        "num_log {} is greater than log length {}",
+        num_log,
+        log_len
+    );
     for idx in 0..num_log {
         LOG.with(|log| {
             let mut buf = Vec::new();
@@ -146,19 +150,19 @@ pub fn read_log_from_first(num_log: u64) -> Result<Vec<String>, String> {
             logs.push(String::from_utf8(buf).unwrap());
         });
     }
-    Ok(logs)
+    logs
 }
 
 #[ic_cdk::query]
-pub fn read_log_from_last(num_log: u64) -> Result<Vec<String>, String> {
+pub fn read_log_from_last(num_log: u64) -> Vec<String> {
     let mut logs = Vec::with_capacity(num_log as usize);
     let log_len = LOG.with(|log| log.borrow().len());
-    if num_log > log_len {
-        return Err(format!(
-            "num_log {} is greater than log length {}",
-            num_log, log_len
-        ));
-    }
+    assert!(
+        num_log <= log_len,
+        "num_log {} is greater than log length {}",
+        num_log,
+        log_len
+    );
     for idx in (log_len - num_log)..log_len {
         LOG.with(|log| {
             let mut buf = Vec::new();
@@ -168,7 +172,7 @@ pub fn read_log_from_last(num_log: u64) -> Result<Vec<String>, String> {
             logs.push(String::from_utf8(buf).unwrap());
         });
     }
-    Ok(logs)
+    logs
 }
 
 #[ic_cdk::update]
