@@ -4,21 +4,55 @@ use poseidon_rs::*;
 
 #[ic_cdk::inspect_message]
 fn inspect_message() {
+    // Reject any incoming messages and panic.
     ic_cdk::api::call::reject_message();
     panic!("call from users is not allowed");
 }
 
+/// Computes the hash of the given public key.
+///
+/// # Arguments
+///
+/// * `public_key_hex` - A string representing the public key in hexadecimal format.
+///
+/// # Returns
+///
+/// A result containing the hashed public key as a hexadecimal string, or an error message.
 #[ic_cdk::update]
 pub fn public_key_hash(public_key_hex: String) -> Result<String, String> {
+    // Accept all available cycles.
     ic_cdk::api::call::msg_cycles_accept(ic_cdk::api::call::msg_cycles_available());
+
+    // Decode the hexadecimal public key string into a byte array.
     let mut public_key_n = hex::decode(&public_key_hex[2..]).map_err(|e| e.to_string())?;
+
+    // Reverse the byte array.
     public_key_n.reverse();
+
+    // Convert the byte array into a vector of field elements.
     let inputs = bytes_chunk_fields(&public_key_n, 121, 2);
+
+    // Compute the Poseidon hash of the field elements.
     let field = poseidon_fields(&inputs).map_err(|e| e.to_string())?;
+
+    // Convert the hash result into a hexadecimal string.
     let hex = format!("{:?}", field);
+
+    // Return the hash result.
     Ok(hex)
 }
 
+/// Converts a byte array into a vector of field elements.
+///
+/// # Arguments
+///
+/// * `bytes` - A slice of bytes to be converted.
+/// * `chunk_size` - The size of each chunk in bits.
+/// * `num_chunk_in_field` - The number of chunks in each field element.
+///
+/// # Returns
+///
+/// A vector of field elements.
 fn bytes_chunk_fields(bytes: &[u8], chunk_size: usize, num_chunk_in_field: usize) -> Vec<Fr> {
     let bits = bytes
         .into_iter()

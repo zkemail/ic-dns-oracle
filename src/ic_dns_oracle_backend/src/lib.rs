@@ -21,6 +21,13 @@ use rsa::{
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, cell::RefCell, collections::HashMap};
 
+/// Structure representing a signature for a new DKIM public key.
+///
+/// # Fields
+/// - `selector`: The selector for the DKIM key.
+/// - `domain`: The domain associated with the DKIM key.
+/// - `signature`: The signature of the DKIM key.
+/// - `public_key`: The public key itself.
 #[derive(Default, CandidType, Deserialize, Debug, Clone)]
 pub struct SignedDkimPublicKey {
     pub selector: String,
@@ -30,6 +37,15 @@ pub struct SignedDkimPublicKey {
     pub public_key_hash: String,
 }
 
+/// Structure representing a signature for a revoked DKIM public key.
+///
+/// # Fields
+/// - `selector`: The selector for the DKIM key.
+/// - `domain`: The domain associated with the DKIM key.
+/// - `signature`: The signature of the DKIM key.
+/// - `public_key`: The public key itself.
+/// - `public_key_hash`: The hash of the public key.
+/// - `private_key`: The private key used to sign the revocation.
 #[derive(Default, CandidType, Deserialize, Debug, Clone)]
 pub struct SignedRevocation {
     pub selector: String,
@@ -40,21 +56,21 @@ pub struct SignedRevocation {
     pub private_key: String,
 }
 
+/// The memory manager is used for simulating multiple memories.
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 thread_local! {
-    // The memory manager is used for simulating multiple memories. Given a `MemoryId` it can
-    // return a memory that can be used by stable structures.
+    /// Given a `MemoryId` it can return a memory that can be used by stable structures.
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 
-    // Initialize a `StableBTreeMap` with `MemoryId(0)`.
+    /// Initialize a `StableBTreeMap` with `MemoryId(0)`.
     static CONFIG: RefCell<StableBTreeMap<u8, String, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
         )
     );
 
-    // Initialize a `StableLog` with `MemoryId(1)` and `MemoryId(2)`.
+    /// Initialize a `StableLog` with `MemoryId(1)` and `MemoryId(2)`.
     static LOG: RefCell<StableLog<String, Memory, Memory>> = RefCell::new(
         StableLog::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1))),
@@ -63,6 +79,11 @@ thread_local! {
     );
 }
 
+/// Initializes the configuration of the environment for the evm signer, memory manager and the stable structures.
+/// # Arguments
+/// * `evn_opt` - The environment option of the evm signer.
+/// * `poseidon_canister_id` - The canister id of the poseidon canister.
+/// * `dns_client_canister_id` - The canister id of the dns client canister.
 #[ic_cdk::init]
 pub fn init(
     evn_opt: Option<Environment>,
@@ -78,17 +99,20 @@ pub fn init(
     });
 }
 
+/// The pre-upgrade function for the canister.
+/// It calls the pre-upgrade function of the evm signer.
 #[ic_cdk::pre_upgrade]
 pub fn pre_upgrade_function() {
     ic_evm_sign::pre_upgrade();
 }
 
+/// The post-upgrade function for the canister.
+/// It calls the post-upgrade function of the evm signer.
+/// # Arguments
+/// * `poseidon_canister_id` - The canister id of the poseidon canister.
+/// * `dns_client_canister_id` - The canister id of the dns client canister.
 #[ic_cdk::post_upgrade]
-pub fn post_upgrade_function(
-    evn_opt: Option<Environment>,
-    poseidon_canister_id: String,
-    dns_client_canister_id: String,
-) {
+pub fn post_upgrade_function(poseidon_canister_id: String, dns_client_canister_id: String) {
     ic_evm_sign::post_upgrade();
     CONFIG.with(|config| {
         config.borrow_mut().insert(1, poseidon_canister_id.clone());
@@ -98,6 +122,9 @@ pub fn post_upgrade_function(
     });
 }
 
+/// Returns the ethereum address used for signing.
+/// # Returns
+/// The hex string of the ethereum address used for signing.
 #[ic_cdk::query]
 pub fn get_ethereum_address() -> String {
     CONFIG.with(|config| {
@@ -109,6 +136,9 @@ pub fn get_ethereum_address() -> String {
     })
 }
 
+/// Returns the canister id of the poseidon canister.
+/// # Returns
+/// The canister id of the poseidon canister.
 #[ic_cdk::query]
 pub fn get_poseidon_canister_id() -> String {
     CONFIG.with(|config| {
@@ -120,6 +150,9 @@ pub fn get_poseidon_canister_id() -> String {
     })
 }
 
+/// Returns the canister id of the dns client canister.
+/// # Returns
+/// The canister id of the dns client canister.
 #[ic_cdk::query]
 pub fn get_dns_client_canister_id() -> String {
     CONFIG.with(|config| {
@@ -131,6 +164,11 @@ pub fn get_dns_client_canister_id() -> String {
     })
 }
 
+/// Returns the logs of the canister.
+/// # Arguments
+/// * `num_log` - The number of logs to return.
+/// # Returns
+/// The `num_log` log entries of the canister taken from the first log entry.
 #[ic_cdk::query]
 pub fn read_log_from_first(num_log: u64) -> Vec<String> {
     let mut logs = Vec::with_capacity(num_log as usize);
@@ -153,6 +191,11 @@ pub fn read_log_from_first(num_log: u64) -> Vec<String> {
     logs
 }
 
+/// Returns the logs of the canister.
+/// # Arguments
+/// * `num_log` - The number of logs to return.
+/// # Returns
+/// The `num_log` log entries of the canister taken from the last log entry.
 #[ic_cdk::query]
 pub fn read_log_from_last(num_log: u64) -> Vec<String> {
     let mut logs = Vec::with_capacity(num_log as usize);
@@ -175,6 +218,14 @@ pub fn read_log_from_last(num_log: u64) -> Vec<String> {
     logs
 }
 
+/// Signs a new DKIM public key fetched from Google DNS.
+/// # Arguments
+/// * `selector` - The selector for the DKIM key.
+/// * `domain` - The domain associated with the DKIM key.
+/// # Returns
+/// The signed DKIM public key.
+/// # Errors
+/// An error message is returned if 1) the public key is not found or 2) the signing fails,
 #[ic_cdk::update]
 pub async fn sign_dkim_public_key(
     selector: String,
@@ -243,6 +294,7 @@ async fn _sign_dkim_public_key(
     domain: String,
 ) -> Result<SignedDkimPublicKey, String> {
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
+    /// Accept all available cycles.
     ic_cdk::api::call::msg_cycles_accept128(available_cycles);
     LOG.with(|log| {
         log.borrow_mut()
@@ -254,6 +306,7 @@ async fn _sign_dkim_public_key(
     });
     let is_null_addr = CONFIG.with(|config| config.borrow().get(&0).is_none());
     if is_null_addr {
+        /// Generate ethereum address if it has not been set yet.
         LOG.with(|log| {
             log.borrow_mut()
                 .append(&format!(
@@ -297,6 +350,7 @@ async fn _sign_dkim_public_key(
             ))
             .expect("failed to append log")
     });
+    /// Fetch the public key from Google DNS.
     let (public_key,): (Result<String, String>,) = ic_cdk::api::call::call(
         dns_client_canister_id,
         "get_dkim_public_key",
@@ -335,6 +389,7 @@ async fn _sign_dkim_public_key(
             ))
             .expect("failed to append log")
     });
+    /// Compute the hash of the public key.
     let (res,): (Result<String, String>,) = ic_cdk::api::call::call(
         poseidon_canister_id,
         "public_key_hash",
@@ -369,6 +424,7 @@ async fn _sign_dkim_public_key(
             ))
             .expect("failed to append log")
     });
+    /// Sign the message.
     let signature =
         ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
     LOG.with(|log| {
@@ -394,6 +450,15 @@ async fn _sign_dkim_public_key(
     Ok(res)
 }
 
+/// Signs a revoked DKIM public key corresponding to the given private key.
+/// # Arguments
+/// * `selector` - The selector for the DKIM key.
+/// * `domain` - The domain associated with the DKIM key.
+/// * `private_key_der` - The private key corresponding to the public key to be revoked.
+/// # Returns
+/// The signed revocation of the DKIM public key.
+/// # Errors
+/// An error message is returned if 1) the public key is not found in DNS, 2) the fecth public key does not match with that derived from the given private key, or 3) the signing fails,
 #[ic_cdk::update]
 pub async fn revoke_dkim_public_key(
     selector: String,
@@ -464,6 +529,7 @@ async fn _revoke_dkim_public_key(
     private_key_der: String,
 ) -> Result<SignedRevocation, String> {
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
+    /// Accept all available cycles.
     ic_cdk::api::call::msg_cycles_accept128(available_cycles);
     LOG.with(|log| {
         log.borrow_mut()
@@ -476,6 +542,7 @@ async fn _revoke_dkim_public_key(
     if CONFIG.with(|config| config.borrow().get(&0).is_none()) {
         return Err("ethereum address not found".to_string());
     }
+    /// Generate the public key from the private key.
     let revoked_public_key = {
         let private_key = RsaPrivateKey::from_pkcs1_der(private_key_der.as_bytes())
             .expect("Invalid format private key");
@@ -506,6 +573,7 @@ async fn _revoke_dkim_public_key(
             ))
             .expect("failed to append log")
     });
+    /// Fetch the public key from Google DNS.
     let (fetched_public_key,): (Result<String, String>,) = ic_cdk::api::call::call(
         dns_client_canister_id,
         "get_dkim_public_key",
@@ -529,6 +597,7 @@ async fn _revoke_dkim_public_key(
             ))
             .expect("failed to append log");
     });
+    /// Check if the fetched public key matches with the derived public key.
     if revoked_public_key != fetched_public_key {
         return Err("public key mismatch".to_string());
     }
@@ -547,6 +616,7 @@ async fn _revoke_dkim_public_key(
             ))
             .expect("failed to append log")
     });
+    /// Compute the hash of the public key.
     let (res,): (Result<String, String>,) = ic_cdk::api::call::call(
         poseidon_canister_id,
         "public_key_hash",
@@ -581,6 +651,7 @@ async fn _revoke_dkim_public_key(
             ))
             .expect("failed to append log");
     });
+    /// Sign the message.
     let signature =
         ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
     LOG.with(|log| {
@@ -601,7 +672,6 @@ async fn _revoke_dkim_public_key(
     let res = SignedRevocation {
         selector,
         domain: domain.clone(),
-        // chain_id: canister_state.chain_id,
         signature,
         public_key: fetched_public_key,
         public_key_hash: public_key_hash_hex,
@@ -629,31 +699,7 @@ mod test {
     use rsa::pkcs1::{der::SecretDocument, EncodeRsaPrivateKey};
     use rsa::rand_core::OsRng;
 
-    // #[test]
-    // fn test_sign_dkim_public_key() {
-    //     // The following values are obtained by running the canister locally.
-    //     let domain = "gmail.com";
-    //     let public_key = "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f";
-    //     let pk_hash = "0x0ea9c777dc7110e5a9e89b13f0cfc540e3845ba120b2b6dc24024d61488d4788";
-    //     assert_eq!(public_key_hash(public_key.to_string()).unwrap(), pk_hash);
-    //     let expected_msg = format!("SET:domain={};public_key_hash={};", domain, pk_hash);
-    //     println!("expected_msg {}", expected_msg);
-    //     let len = expected_msg.len();
-    //     let len_string = len.to_string();
-    //     const PREFIX: &str = "\x19Ethereum Signed Message:\n";
-    //     let mut eth_message = Vec::with_capacity(PREFIX.len() + len_string.len() + len);
-    //     eth_message.extend_from_slice(PREFIX.as_bytes());
-    //     eth_message.extend_from_slice(len_string.as_bytes());
-    //     eth_message.extend_from_slice(&expected_msg.as_bytes());
-    //     println!("hash {}", hex::encode(raw_keccak256(eth_message).to_vec()));
-    //     let signature = Signature::from_str("0x1989dad50b6635c11d365b7caca70cbeccdf37b201e0bc191d24e0842c9720184d14be94bac0b79213f87bf63daff4d34382ef55aed93688a393bd34330e00f01c").unwrap();
-    //     let recovered = signature.recover(expected_msg).unwrap();
-    //     assert_eq!(
-    //         recovered,
-    //         H160::from_slice(&hex::decode("1c63df16d1212ecf5d497984dfd1aa23904756ff").unwrap())
-    //     );
-    // }
-
+ 
     #[test]
     fn test_private_to_public() {
         let private_key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();

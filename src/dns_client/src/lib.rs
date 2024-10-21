@@ -12,6 +12,17 @@ use rsa::{
 };
 use serde_json::{self, Value};
 
+/// Fetches the DKIM public key for the given selector and domain.
+///
+/// # Arguments
+///
+/// * `selector` - The DKIM selector.
+/// * `domain` - The domain for which to fetch the DKIM public key.
+/// * `cycle` - The number of cycles to send with the request.
+///
+/// # Returns
+///
+/// A result containing the DKIM public key as a hexadecimal string, or an error message.
 #[ic_cdk::update]
 pub async fn get_dkim_public_key(
     selector: String,
@@ -35,32 +46,20 @@ pub async fn get_dkim_public_key(
         },
     ];
 
-    // let context = Context {
-    //     bucket_start_time_index: 0,
-    //     closing_price_index: 4,
-    // };
-
     let transform = TransformContext::from_name("transform".to_string(), vec![]);
-    //note "CanisterHttpRequestArgument" and "HttpMethod" are declared in line 4
     let request = CanisterHttpRequestArgument {
         url: url.to_string(),
         method: HttpMethod::GET,
-        body: None,                      //optional for request
+        body: None,                      // Optional for request
         max_response_bytes: Some(65536), // 64KB
-        // transform: None,          //optional for request
         transform: Some(transform),
         headers: request_headers,
     };
 
-    //Note: in Rust, `http_request()` already sends the cycles needed
-    //so no need for explicit Cycles.add() as in Motoko
     match http_request(request, cycle as u128).await {
-        //4. DECODE AND RETURN THE RESPONSE
-
-        //See:https://docs.rs/ic-cdk/latest/ic_cdk/api/management_canister/http_request/struct.HttpResponse.html
+        // Decode and return the response.
         Ok((response,)) => {
             if response.status != Nat::from(200u64) {
-                // ic_cdk::api::print(format!("Received an error from coinbase: err = {:?}", raw));
                 return Err(format!(
                     "Received an error from google dns: err = {:?}",
                     response.body
@@ -73,12 +72,21 @@ pub async fn get_dkim_public_key(
             let message =
                 format!("The http_request resulted into error. RejectionCode: {r:?}, Error: {m}");
 
-            //Return the error as a string and end the method
+            // Return the error as a string and end the method.
             Err(message)
         }
     }
 }
 
+/// Transforms the raw HTTP response into a structured `HttpResponse`.
+///
+/// # Arguments
+///
+/// * `raw` - The raw HTTP response to transform.
+///
+/// # Returns
+///
+/// A structured `HttpResponse`.
 #[ic_cdk::query]
 fn transform(raw: TransformArgs) -> HttpResponse {
     match _transform(raw) {
@@ -87,6 +95,15 @@ fn transform(raw: TransformArgs) -> HttpResponse {
     }
 }
 
+/// Helper function to transform the raw HTTP response.
+///
+/// # Arguments
+///
+/// * `raw` - The raw HTTP response to transform.
+///
+/// # Returns
+///
+/// A result containing the structured `HttpResponse`, or an error message.
 fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
     let headers = vec![
         HttpHeader {
