@@ -48,7 +48,7 @@ thread_local! {
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 
     // Initialize a `StableBTreeMap` with `MemoryId(0)`.
-    static CONFIG: RefCell<StableBTreeMap<u128, String, Memory>> = RefCell::new(
+    static CONFIG: RefCell<StableBTreeMap<u8, String, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
         )
@@ -238,7 +238,6 @@ pub async fn sign_dkim_public_key(
     ))
 }
 
-#[ic_cdk::update]
 async fn _sign_dkim_public_key(
     selector: String,
     domain: String,
@@ -255,7 +254,22 @@ async fn _sign_dkim_public_key(
     });
     let is_null_addr = CONFIG.with(|config| config.borrow().get(&0).is_none());
     if is_null_addr {
+        LOG.with(|log| {
+            log.borrow_mut()
+                .append(&format!(
+                    "fn _sign_dkim_public_key: [before creating ethereum address]"
+                ))
+                .expect("failed to append log")
+        });
         let address = create_ethereum_address().await?;
+        LOG.with(|log| {
+            log.borrow_mut()
+                .append(&format!(
+                    "fn _sign_dkim_public_key: [after creating ethereum address] {}",
+                    address
+                ))
+                .expect("failed to append log")
+        });
         CONFIG.with(|config| {
             config.borrow_mut().insert(0, address.clone());
         });
@@ -276,6 +290,13 @@ async fn _sign_dkim_public_key(
             .clone()
     });
     let dns_client_canister_id = Principal::from_text(dns_client_canister_id_str).unwrap();
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _sign_dkim_public_key: [before calling get_dkim_public_key]"
+            ))
+            .expect("failed to append log")
+    });
     let (public_key,): (Result<String, String>,) = ic_cdk::api::call::call(
         dns_client_canister_id,
         "get_dkim_public_key",
@@ -283,6 +304,13 @@ async fn _sign_dkim_public_key(
     )
     .await
     .map_err(|(code, e)| format!("dns_client canister error. {:?}, {}", code, e))?;
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _sign_dkim_public_key: [after calling get_dkim_public_key]"
+            ))
+            .expect("failed to append log")
+    });
     let public_key = public_key?;
     LOG.with(|log| {
         log.borrow_mut()
@@ -300,6 +328,13 @@ async fn _sign_dkim_public_key(
             .clone()
     });
     let poseidon_canister_id = Principal::from_text(poseidon_canister_id_str).unwrap();
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _sign_dkim_public_key: [before calling public_key_hash]"
+            ))
+            .expect("failed to append log")
+    });
     let (res,): (Result<String, String>,) = ic_cdk::api::call::call(
         poseidon_canister_id,
         "public_key_hash",
@@ -307,6 +342,13 @@ async fn _sign_dkim_public_key(
     )
     .await
     .map_err(|(code, e)| format!("poseidon canister error. {:?}, {}", code, e))?;
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _sign_dkim_public_key: [after calling public_key_hash]"
+            ))
+            .expect("failed to append log")
+    });
     let public_key_hash_hex = res?;
     let message = format!(
         "SET:domain={};public_key_hash={};",
@@ -320,9 +362,28 @@ async fn _sign_dkim_public_key(
             ))
             .expect("failed to append log");
     });
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _sign_dkim_public_key: [before ic_evm_signing]"
+            ))
+            .expect("failed to append log")
+    });
     let signature =
         ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
-
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!("fn _sign_dkim_public_key: [after ic_evm_signing]"))
+            .expect("failed to append log")
+    });
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _sign_dkim_public_key: [signature] {}",
+                signature
+            ))
+            .expect("failed to append log");
+    });
     let res = SignedDkimPublicKey {
         selector,
         domain: domain.clone(),
@@ -339,6 +400,14 @@ pub async fn revoke_dkim_public_key(
     domain: String,
     private_key_der: String,
 ) -> Result<SignedRevocation, String> {
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn revoke_dkim_public_key: [input] selector {}, domain {}, private_key {}",
+                selector, domain, private_key_der
+            ))
+            .expect("failed to append log");
+    });
     let mut error0 = String::new();
     match _revoke_dkim_public_key(selector.clone(), domain.clone(), private_key_der.clone()).await {
         Ok(res) => {
@@ -430,6 +499,13 @@ async fn _revoke_dkim_public_key(
             .clone()
     });
     let dns_client_canister_id = Principal::from_text(dns_client_canister_id_str).unwrap();
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _revoke_dkim_public_key: [before calling get_dkim_public_key]"
+            ))
+            .expect("failed to append log")
+    });
     let (fetched_public_key,): (Result<String, String>,) = ic_cdk::api::call::call(
         dns_client_canister_id,
         "get_dkim_public_key",
@@ -437,6 +513,13 @@ async fn _revoke_dkim_public_key(
     )
     .await
     .map_err(|(code, e)| format!("dns_client canister error. {:?}, {}", code, e))?;
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _revoke_dkim_public_key: [after calling get_dkim_public_key]"
+            ))
+            .expect("failed to append log")
+    });
     let fetched_public_key = fetched_public_key?;
     LOG.with(|log| {
         log.borrow_mut()
@@ -457,6 +540,13 @@ async fn _revoke_dkim_public_key(
             .clone()
     });
     let poseidon_canister_id = Principal::from_text(poseidon_canister_id_str).unwrap();
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _revoke_dkim_public_key: [before calling public_key_hash]"
+            ))
+            .expect("failed to append log")
+    });
     let (res,): (Result<String, String>,) = ic_cdk::api::call::call(
         poseidon_canister_id,
         "public_key_hash",
@@ -464,6 +554,13 @@ async fn _revoke_dkim_public_key(
     )
     .await
     .map_err(|(code, e)| format!("poseidon canister failed. {:?}, {}", code, e))?;
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _revoke_dkim_public_key: [after calling public_key_hash]"
+            ))
+            .expect("failed to append log")
+    });
     let public_key_hash_hex = res?;
     let message = format!(
         "REVOKE:domain={};public_key_hash={};",
@@ -477,9 +574,30 @@ async fn _revoke_dkim_public_key(
             ))
             .expect("failed to append log");
     });
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _revoke_dkim_public_key: [before ic_evm_signing]"
+            ))
+            .expect("failed to append log");
+    });
     let signature =
         ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
-
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _revoke_dkim_public_key: [after ic_evm_signing]"
+            ))
+            .expect("failed to append log");
+    });
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!(
+                "fn _revoke_dkim_public_key: [signature] {}",
+                signature
+            ))
+            .expect("failed to append log");
+    });
     let res = SignedRevocation {
         selector,
         domain: domain.clone(),
@@ -556,3 +674,5 @@ mod test {
         );
     }
 }
+
+ic_cdk::export_candid!();

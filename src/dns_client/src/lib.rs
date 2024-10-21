@@ -159,3 +159,5 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
     }
     Err("No key found".to_string())
 }
+
+ic_cdk::export_candid!();

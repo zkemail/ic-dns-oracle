@@ -10,9 +10,6 @@ fn inspect_message() {
 
 #[ic_cdk::update]
 pub fn public_key_hash(public_key_hex: String) -> Result<String, String> {
-    // if !ic_cdk::api::is_controller(&ic_cdk::caller()) {
-    //     return Err("only the call from the controller is allowed".to_string());
-    // }
     ic_cdk::api::call::msg_cycles_accept(ic_cdk::api::call::msg_cycles_available());
     let mut public_key_n = hex::decode(&public_key_hex[2..]).map_err(|e| e.to_string())?;
     public_key_n.reverse();
@@ -72,3 +69,5 @@ getrandom::register_custom_getrandom!(always_fail);
 pub fn always_fail(_buf: &mut [u8]) -> Result<(), getrandom::Error> {
     Err(getrandom::Error::UNSUPPORTED)
 }
+
+ic_cdk::export_candid!();

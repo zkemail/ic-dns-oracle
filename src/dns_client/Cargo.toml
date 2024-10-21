@@ -29,3 +29,6 @@ ic-evm-sign = { version = "0.1.4", git = "https://github.com/SoraSuegami/ic-evm-
 ethers-core = "2.0.10"
 easy-hasher = "2.2.1"
 poseidon = { path = "../poseidon" }
+
+[patch.crates-io]
+ic-cdk = { version = "0.16.0" }
