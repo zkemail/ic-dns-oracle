@@ -451,7 +451,7 @@ dependencies = [
  "easy-hasher",
  "ethers-core",
  "hex",
- "ic-cdk 0.16.0",
+ "ic-cdk",
  "ic-evm-sign",
  "poseidon",
  "regex",
@@ -782,42 +782,15 @@ dependencies = [
 
 [[package]]
 name = "ic-cdk"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e908da565d9e304e83732500069ebb959e3d2cad80f894889ea37207112c7a0"
-dependencies = [
- "candid",
- "ic-cdk-macros 0.8.4",
- "ic0 0.21.1",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
-name = "ic-cdk"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8ecacd682fa05a985253592963306cb9799622d7b1cce4b1edb89c6ec85be1"
 dependencies = [
  "candid",
- "ic-cdk-macros 0.16.0",
- "ic0 0.23.0",
+ "ic-cdk-macros",
+ "ic0",
  "serde",
  "serde_bytes",
-]
-
-[[package]]
-name = "ic-cdk-macros"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5a618e4020cea88e933d8d2f8c7f86d570ec06213506a80d4f2c520a9bba512"
-dependencies = [
- "candid",
- "proc-macro2",
- "quote",
- "serde",
- "serde_tokenstream 0.1.7",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -830,21 +803,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "serde_tokenstream 0.2.2",
+ "serde_tokenstream",
  "syn 2.0.82",
 ]
 
 [[package]]
 name = "ic-evm-sign"
-version = "0.1.5"
-source = "git+https://github.com/SoraSuegami/ic-evm-sign.git#b5cbfabb858df191e7399825582b260e583b7f42"
+version = "0.1.6"
+source = "git+https://github.com/SoraSuegami/ic-evm-sign.git#6c0104b62b126b155c4d7f59897834381532ad13"
 dependencies = [
  "candid",
  "easy-hasher",
  "ethereum-rlp",
  "getrandom",
  "hex",
- "ic-cdk 0.12.2",
+ "ic-cdk",
  "libsecp256k1",
  "primitive-types",
  "serde",
@@ -861,12 +834,6 @@ dependencies = [
 
 [[package]]
 name = "ic0"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a54b5297861c651551676e8c43df805dad175cc33bc97dbd992edbbb85dcbcdf"
-
-[[package]]
-name = "ic0"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8de254dd67bbd58073e23dc1c8553ba12fa1dc610a19de94ad2bbcd0460c067f"
@@ -879,7 +846,7 @@ dependencies = [
  "easy-hasher",
  "ethers-core",
  "hex",
- "ic-cdk 0.16.0",
+ "ic-cdk",
  "ic-evm-sign",
  "ic-stable-structures",
  "poseidon",
@@ -1304,7 +1271,7 @@ dependencies = [
  "ff",
  "getrandom",
  "hex",
- "ic-cdk 0.16.0",
+ "ic-cdk",
  "poseidon-rs",
 ]
 
@@ -1664,17 +1631,6 @@ dependencies = [
 
 [[package]]
 name = "serde_tokenstream"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "797ba1d80299b264f3aac68ab5d12e5825a561749db4df7cd7c8083900c5d4e9"
-dependencies = [
- "proc-macro2",
- "serde",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "serde_tokenstream"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64060d864397305347a78851c51588fd283767e7e7589829e8121d65512340f1"
@@ -1807,7 +1763,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

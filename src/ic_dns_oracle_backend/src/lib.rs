@@ -90,21 +90,9 @@ pub fn init(
     poseidon_canister_id: String,
     dns_client_canister_id: String,
 ) {
-    ic_evm_sign::init(evn_opt.clone());
-    CONFIG.with(|config| {
-        config.borrow_mut().insert(1, poseidon_canister_id.clone());
-        config
-            .borrow_mut()
-            .insert(2, dns_client_canister_id.clone());
-    });
+    _init(evn_opt, poseidon_canister_id, dns_client_canister_id);
 }
 
-/// The pre-upgrade function for the canister.
-/// It calls the pre-upgrade function of the evm signer.
-#[ic_cdk::pre_upgrade]
-pub fn pre_upgrade_function() {
-    ic_evm_sign::pre_upgrade();
-}
 
 /// The post-upgrade function for the canister.
 /// It calls the post-upgrade function of the evm signer.
@@ -118,12 +106,9 @@ pub fn post_upgrade_function(
     poseidon_canister_id: String, 
     dns_client_canister_id: String
 ) {
-    ic_evm_sign::post_upgrade();
+    _init(evn_opt, poseidon_canister_id, dns_client_canister_id);
     CONFIG.with(|config| {
-        config.borrow_mut().insert(1, poseidon_canister_id.clone());
-        config
-            .borrow_mut()
-            .insert(2, dns_client_canister_id.clone());
+        config.borrow_mut().remove(&0);
     });
 }
 
@@ -292,6 +277,20 @@ pub async fn sign_dkim_public_key(
         "any signing failed. error0: {}, error1: {}",
         error0, error1
     ))
+}
+
+fn _init(
+    evn_opt: Option<Environment>,
+    poseidon_canister_id: String,
+    dns_client_canister_id: String,
+) {
+    ic_evm_sign::init(evn_opt.clone());
+    CONFIG.with(|config| {
+        config.borrow_mut().insert(1, poseidon_canister_id.clone());
+        config
+            .borrow_mut()
+            .insert(2, dns_client_canister_id.clone());
+    });
 }
 
 async fn _sign_dkim_public_key(
