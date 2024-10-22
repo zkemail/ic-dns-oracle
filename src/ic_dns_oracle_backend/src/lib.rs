@@ -109,10 +109,15 @@ pub fn pre_upgrade_function() {
 /// The post-upgrade function for the canister.
 /// It calls the post-upgrade function of the evm signer.
 /// # Arguments
+/// * `evn_opt` - The environment option of the evm signer.
 /// * `poseidon_canister_id` - The canister id of the poseidon canister.
 /// * `dns_client_canister_id` - The canister id of the dns client canister.
 #[ic_cdk::post_upgrade]
-pub fn post_upgrade_function(poseidon_canister_id: String, dns_client_canister_id: String) {
+pub fn post_upgrade_function(
+    evn_opt: Option<Environment>,
+    poseidon_canister_id: String, 
+    dns_client_canister_id: String
+) {
     ic_evm_sign::post_upgrade();
     CONFIG.with(|config| {
         config.borrow_mut().insert(1, poseidon_canister_id.clone());

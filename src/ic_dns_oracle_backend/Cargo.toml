@@ -1,6 +1,6 @@
 [package]
 name = "ic_dns_oracle_backend"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -19,7 +19,7 @@ serde = { version = "1.0.152", default-features = false }
 hex = { version = "0.4.3", default-features = false }
 rsa = { version = "0.9.6", default-features = false }
 # sha2 = { version = "0.10.6", default-features = false }
-ic-evm-sign = { version = "0.1.4", git = "https://github.com/SoraSuegami/ic-evm-sign.git" }
+ic-evm-sign = { version = "0.1.5", git = "https://github.com/SoraSuegami/ic-evm-sign.git" }
 ic-stable-structures = "0.6.5"
 # ic-storage = { version = "0.16.0", git = "https://github.com/bitfinity-network/canister-sdk.git" }
 # ic-exports = { version = "0.16.0", git = "https://github.com/bitfinity-network/canister-sdk.git" }

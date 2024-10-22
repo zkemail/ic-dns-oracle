@@ -202,9 +202,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
-version = "1.7.2"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "428d9aa8fbc0670b7b8d6030a7fadd0f86151cae55e4dbbece15f3780a3dfaf3"
+checksum = "9ac0150caa2ae65ca5bd83f25c7de183dea78d4d366469f148435e2acfbad0da"
 dependencies = [
  "serde",
 ]
@@ -444,7 +444,7 @@ dependencies = [
 
 [[package]]
 name = "dns_client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.21.7",
  "candid",
@@ -836,8 +836,8 @@ dependencies = [
 
 [[package]]
 name = "ic-evm-sign"
-version = "0.1.4"
-source = "git+https://github.com/SoraSuegami/ic-evm-sign.git#3edb7b2e30e4d21eef4a75452907b7a20e19378b"
+version = "0.1.5"
+source = "git+https://github.com/SoraSuegami/ic-evm-sign.git#b5cbfabb858df191e7399825582b260e583b7f42"
 dependencies = [
  "candid",
  "easy-hasher",
@@ -873,7 +873,7 @@ checksum = "8de254dd67bbd58073e23dc1c8553ba12fa1dc610a19de94ad2bbcd0460c067f"
 
 [[package]]
 name = "ic_dns_oracle_backend"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "candid",
  "easy-hasher",
@@ -1298,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "poseidon"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "candid",
  "ff",
@@ -1623,9 +1623,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.210"
+version = "1.0.211"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8e3592472072e6e22e0a54d5904d9febf8508f65fb8552499a1abc7d1078c3a"
+checksum = "1ac55e59090389fb9f0dd9e0f3c09615afed1d19094284d0b200441f13550793"
 dependencies = [
  "serde_derive",
 ]
@@ -1641,9 +1641,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.210"
+version = "1.0.211"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "243902eda00fad750862fc144cea25caca5e20d615af0a81bee94ca738f1df1f"
+checksum = "54be4f245ce16bc58d57ef2716271d0d4519e0f6defa147f6e081005bcb278ff"
 dependencies = [
  "proc-macro2",
  "quote",
