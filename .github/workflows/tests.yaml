@@ -23,6 +23,7 @@ jobs:
         toolchain: stable
         override: true
         components: rustfmt, clippy
+        target: wasm32-unknown-unknown
 
     - name: Run tests
       run: cargo test --target wasm32-unknown-unknown
