@@ -93,7 +93,6 @@ pub fn init(
     _init(evn_opt, poseidon_canister_id, dns_client_canister_id);
 }
 
-
 /// The post-upgrade function for the canister.
 /// It calls the post-upgrade function of the evm signer.
 /// # Arguments
@@ -103,8 +102,8 @@ pub fn init(
 #[ic_cdk::post_upgrade]
 pub fn post_upgrade_function(
     evn_opt: Option<Environment>,
-    poseidon_canister_id: String, 
-    dns_client_canister_id: String
+    poseidon_canister_id: String,
+    dns_client_canister_id: String,
 ) {
     _init(evn_opt, poseidon_canister_id, dns_client_canister_id);
     CONFIG.with(|config| {
@@ -703,7 +702,6 @@ mod test {
     use rsa::pkcs1::{der::SecretDocument, EncodeRsaPrivateKey};
     use rsa::rand_core::OsRng;
 
- 
     #[test]
     fn test_private_to_public() {
         let private_key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();

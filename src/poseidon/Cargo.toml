@@ -19,3 +19,6 @@ poseidon-rs = { git = "https://github.com/SoraSuegami/poseidon-rs.git", version 
 ff = { version = "0.13.0", default-features = false }
 getrandom = { version = "0.2", features = ["custom"] }
 # poseidon_types = { path = "../poseidon_types" }
+
+[dev-dependencies]
+pocket-ic = "5.0.0"

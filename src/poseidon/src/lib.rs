@@ -2,12 +2,12 @@ use ff::PrimeField;
 use hex;
 use poseidon_rs::*;
 
-#[ic_cdk::inspect_message]
-fn inspect_message() {
-    // Reject any incoming messages and panic.
-    ic_cdk::api::call::reject_message();
-    panic!("call from users is not allowed");
-}
+// #[ic_cdk::inspect_message]
+// fn inspect_message() {
+//     // Reject any incoming messages and panic.
+//     ic_cdk::api::call::reject_message();
+//     panic!("call from users is not allowed");
+// }
 
 /// Computes the hash of the given public key.
 ///
@@ -22,7 +22,10 @@ fn inspect_message() {
 pub fn public_key_hash(public_key_hex: String) -> Result<String, String> {
     // Accept all available cycles.
     ic_cdk::api::call::msg_cycles_accept(ic_cdk::api::call::msg_cycles_available());
+    _public_key_hash(public_key_hex)
+}
 
+pub(crate) fn _public_key_hash(public_key_hex: String) -> Result<String, String> {
     // Decode the hexadecimal public key string into a byte array.
     let mut public_key_n = hex::decode(&public_key_hex[2..]).map_err(|e| e.to_string())?;
 
@@ -30,7 +33,7 @@ pub fn public_key_hash(public_key_hex: String) -> Result<String, String> {
     public_key_n.reverse();
 
     // Convert the byte array into a vector of field elements.
-    let inputs = bytes_chunk_fields(&public_key_n, 121, 2);
+    let inputs = _bytes_chunk_fields(&public_key_n, 121, 2);
 
     // Compute the Poseidon hash of the field elements.
     let field = poseidon_fields(&inputs).map_err(|e| e.to_string())?;
@@ -41,7 +44,6 @@ pub fn public_key_hash(public_key_hex: String) -> Result<String, String> {
     // Return the hash result.
     Ok(hex)
 }
-
 /// Converts a byte array into a vector of field elements.
 ///
 /// # Arguments
@@ -53,7 +55,7 @@ pub fn public_key_hash(public_key_hex: String) -> Result<String, String> {
 /// # Returns
 ///
 /// A vector of field elements.
-fn bytes_chunk_fields(bytes: &[u8], chunk_size: usize, num_chunk_in_field: usize) -> Vec<Fr> {
+fn _bytes_chunk_fields(bytes: &[u8], chunk_size: usize, num_chunk_in_field: usize) -> Vec<Fr> {
     let bits = bytes
         .into_iter()
         .flat_map(|byte| {
@@ -105,3 +107,49 @@ pub fn always_fail(_buf: &mut [u8]) -> Result<(), getrandom::Error> {
 }
 
 ic_cdk::export_candid!();
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use candid::{decode_one, encode_args, encode_one, Encode, Principal};
+    use ic_cdk::api::call::RejectionCode;
+    use pocket_ic::{
+        common::rest::{
+            BlobCompression, CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse,
+            RawEffectivePrincipal, SubnetKind, CanisterHttpHeader
+        },
+        update_candid, PocketIc, WasmResult,
+    };
+
+
+    const PUBLIC_KEY: &'static str = "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f";
+    const PUBLIC_KEY_HASH: &'static str = "0x0ea9c777dc7110e5a9e89b13f0cfc540e3845ba120b2b6dc24024d61488d4788";
+
+    #[test]
+    fn test_poseidon_pure() {
+        assert_eq!(_public_key_hash(PUBLIC_KEY.to_string()).unwrap(), PUBLIC_KEY_HASH.to_string());
+    }
+
+    #[test]
+    fn test_poseidon_canister() {
+        let pic = PocketIc::new();
+        // Create an empty canister as the anonymous principal and add cycles.
+        let canister_id = pic.create_canister();
+        pic.add_cycles(canister_id, 2_000_000_000_000);
+        let wasm_bytes =
+            include_bytes!("../../../target/wasm32-unknown-unknown/release/poseidon.wasm")
+                .to_vec();
+        pic.install_canister(canister_id, wasm_bytes, vec![], None);
+
+        let reply = pic.update_call(canister_id, Principal::anonymous(), "public_key_hash", encode_one(PUBLIC_KEY.to_string()).unwrap()).unwrap();
+        println!("{:?}", reply);
+        match reply {
+            WasmResult::Reply(data) => {
+                let res: Result<String, String> =
+                    decode_one(&data).unwrap();
+                assert_eq!(res.unwrap(), PUBLIC_KEY_HASH);
+            }
+            WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
+        };
+    }
+}
