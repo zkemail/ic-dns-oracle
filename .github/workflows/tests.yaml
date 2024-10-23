@@ -17,3 +17,12 @@ jobs:
     - name: Confirm successful installation
       run: ${{ env.POCKET_IC_BIN }} --version
 
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        components: rustfmt, clippy
+
+    - name: Run tests
+      run: cargo test
