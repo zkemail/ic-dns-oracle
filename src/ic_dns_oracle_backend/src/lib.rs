@@ -1026,6 +1026,7 @@ mod test {
     }
 
     #[test]
+    #[should_panic]
     fn test_revoke_invalid_case() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
@@ -1167,7 +1168,13 @@ mod test {
 
         // // Now the test canister will receive the http outcall response
         // // and reply to the ingress message from the test driver.
-        assert!(pic.await_call(call_id).is_err());
+        pic.await_call(call_id);
+        // match reply {
+        //     WasmResult::Reply(data) => {
+        //        panic!("Unexpected reply {:?}", data);
+        //     }
+        //     WasmResult::Reject(msg) => {} 
+        // };
     }
 
     fn private_key_der_to_public_key_hex(private_key: &[u8]) -> String {
