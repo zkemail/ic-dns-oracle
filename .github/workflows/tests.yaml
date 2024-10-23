@@ -25,4 +25,4 @@ jobs:
         components: rustfmt, clippy
 
     - name: Run tests
-      run: cargo test
+      run: cargo test --target wasm32-unknown-unknown
