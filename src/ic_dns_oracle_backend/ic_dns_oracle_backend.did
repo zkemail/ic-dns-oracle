@@ -18,8 +18,9 @@ type SignedRevocation = record {
 };
 service : (opt Environment, text, text) -> {
   get_dns_client_canister_id : () -> (text) query;
-  get_ethereum_address : () -> (text) query;
   get_poseidon_canister_id : () -> (text) query;
+  get_signer_ethereum_address : () -> (text) query;
+  init_signer_ethereum_address : () -> (text);
   read_log_from_first : (nat64) -> (vec text) query;
   read_log_from_last : (nat64) -> (vec text) query;
   revoke_dkim_public_key : (text, text, text) -> (Result);

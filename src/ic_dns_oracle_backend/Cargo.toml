@@ -19,7 +19,7 @@ serde = { version = "1.0.152", default-features = false }
 hex = { version = "0.4.3", default-features = false }
 rsa = { version = "0.9.6", default-features = false }
 # sha2 = { version = "0.10.6", default-features = false }
-ic-evm-sign = { version = "0.1.6", git = "https://github.com/SoraSuegami/ic-evm-sign.git" }
+ic-evm-sign = { version = "0.1.7", git = "https://github.com/SoraSuegami/ic-evm-sign.git" }
 ic-stable-structures = "0.6.5"
 # ic-storage = { version = "0.16.0", git = "https://github.com/bitfinity-network/canister-sdk.git" }
 # ic-exports = { version = "0.16.0", git = "https://github.com/bitfinity-network/canister-sdk.git" }
@@ -30,3 +30,5 @@ ic-stable-structures = "0.6.5"
 ethers-core = "2.0.10"
 easy-hasher = "2.2.1"
 poseidon = { path = "../poseidon" }
+pocket-ic = "5.0.0"
+libsecp256k1 = { version = "0.7.1", package = "libsecp256k1" }
