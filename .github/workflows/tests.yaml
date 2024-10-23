@@ -11,5 +11,5 @@ jobs:
     - name: Install PocketIC server
       uses: dfinity/pocketic@main
     - name: Confirm successful installation
-      run: "${POCKET_IC_BIN}" --version
+      run: "${{ env.POCKET_IC_BIN }}" --version
 
