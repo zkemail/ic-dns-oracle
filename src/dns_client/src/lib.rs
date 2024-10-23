@@ -337,8 +337,6 @@ mod test {
                         "type": 16
                     }
                 ],
-                "Answer": [
-                ],
                 "Comment": "Response from 216.239.32.10."
             }
             "#;

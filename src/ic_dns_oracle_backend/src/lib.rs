@@ -213,54 +213,32 @@ pub fn read_log_from_last(num_log: u64) -> Vec<String> {
 /// The hex string of the ethereum address used for signing.
 #[ic_cdk::update]
 pub async fn init_signer_ethereum_address() -> String {
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!("fn init_signer_ethereum_address"))
-            .expect("failed to append log");
-    });
+    write_log("init_signer_ethereum_address", "");
     let is_null = CONFIG.with(|config| config.borrow().get(&0).is_none());
     if !is_null {
-        LOG.with(|log| {
-            log.borrow_mut()
-                .append(&format!(
-                    "fn init_signer_ethereum_address: [ethereum address found]"
-                ))
-                .expect("failed to append log");
-        });
+        write_log("init_signer_ethereum_address", "[ethereum address found]");
         return get_signer_ethereum_address();
     }
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn init_signer_ethereum_address: [before creating ethereum address]"
-            ))
-            .expect("failed to append log")
-    });
+    write_log(
+        "init_signer_ethereum_address",
+        "[before creating ethereum address]",
+    );
     let address = create_ethereum_address()
         .await
         .expect("failed to create ethereum address");
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn init_signer_ethereum_address: [after creating ethereum address] {}",
-                address
-            ))
-            .expect("failed to append log")
-    });
+    write_log(
+        "init_signer_ethereum_address",
+        &format!("[after creating ethereum address] {}", address),
+    );
     CONFIG.with(|config| {
         config.borrow_mut().insert(0, address.clone());
     });
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn init_signer_ethereum_address: [generated ethereum address] {}",
-                address
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "init_signer_ethereum_address",
+        &format!("[generated ethereum address] {}", address),
+    );
     address
 }
-
 /// Signs a new DKIM public key fetched from Google DNS.
 /// # Arguments
 /// * `selector` - The selector for the DKIM key.
@@ -274,27 +252,19 @@ pub async fn sign_dkim_public_key(
     selector: String,
     domain: String,
 ) -> Result<SignedDkimPublicKey, String> {
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn sign_dkim_public_key: [input] selector {}, domain {}",
-                selector, domain
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "sign_dkim_public_key",
+        &format!("[input] selector {}, domain {}", selector, domain),
+    );
     let domain_with_gappssmtp =
         format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);
     let mut error0 = String::new();
     match _sign_dkim_public_key(selector.clone(), domain).await {
         Ok(res) => {
-            LOG.with(|log| {
-                log.borrow_mut()
-                    .append(&format!(
-                        "fn sign_dkim_public_key: [first try output] {:?}",
-                        res
-                    ))
-                    .expect("failed to append log");
-            });
+            write_log(
+                "sign_dkim_public_key",
+                &format!("[first try output] {:?}", res),
+            );
             return Ok(res);
         }
         Err(e) => {
@@ -304,28 +274,26 @@ pub async fn sign_dkim_public_key(
     let mut error1 = String::new();
     match _sign_dkim_public_key(selector, domain_with_gappssmtp).await {
         Ok(res) => {
-            LOG.with(|log| {
-                log.borrow_mut()
-                    .append(&format!(
-                        "fn sign_dkim_public_key: [first try error] {}, [second try output] {:?}",
-                        error0, res
-                    ))
-                    .expect("failed to append log");
-            });
+            write_log(
+                "sign_dkim_public_key",
+                &format!(
+                    "[first try error] {}, [second try output] {:?}",
+                    error0, res
+                ),
+            );
             return Ok(res);
         }
         Err(e) => {
             error1 = e;
         }
     }
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn sign_dkim_public_key: [first try error] {}, [second try error] {}",
-                error0, error1
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "sign_dkim_public_key",
+        &format!(
+            "[first try error] {}, [second try error] {}",
+            error0, error1
+        ),
+    );
     Err(format!(
         "any signing failed. error0: {}, error1: {}",
         error0, error1
@@ -353,44 +321,29 @@ async fn _sign_dkim_public_key(
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     /// Accept all available cycles.
     ic_cdk::api::call::msg_cycles_accept128(available_cycles);
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _sign_dkim_public_key: [available cycles] {}",
-                available_cycles
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "_sign_dkim_public_key",
+        &format!("[available cycles] {}", available_cycles),
+    );
     let is_null_addr = CONFIG.with(|config| config.borrow().get(&0).is_none());
     if is_null_addr {
         /// Generate ethereum address if it has not been set yet.
-        LOG.with(|log| {
-            log.borrow_mut()
-                .append(&format!(
-                    "fn _sign_dkim_public_key: [before creating ethereum address]"
-                ))
-                .expect("failed to append log")
-        });
+        write_log(
+            "_sign_dkim_public_key",
+            "[before creating ethereum address]",
+        );
         let address = create_ethereum_address().await?;
-        LOG.with(|log| {
-            log.borrow_mut()
-                .append(&format!(
-                    "fn _sign_dkim_public_key: [after creating ethereum address] {}",
-                    address
-                ))
-                .expect("failed to append log")
-        });
+        write_log(
+            "_sign_dkim_public_key",
+            &format!("[after creating ethereum address] {}", address),
+        );
         CONFIG.with(|config| {
             config.borrow_mut().insert(0, address.clone());
         });
-        LOG.with(|log| {
-            log.borrow_mut()
-                .append(&format!(
-                    "fn _sign_dkim_public_key: [generated ethereum address] {}",
-                    address
-                ))
-                .expect("failed to append log");
-        });
+        write_log(
+            "_sign_dkim_public_key",
+            &format!("[generated ethereum address] {}", address),
+        );
     }
     let dns_client_canister_id_str = CONFIG.with(|config| {
         config
@@ -400,13 +353,10 @@ async fn _sign_dkim_public_key(
             .clone()
     });
     let dns_client_canister_id = Principal::from_text(dns_client_canister_id_str).unwrap();
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _sign_dkim_public_key: [before calling get_dkim_public_key]"
-            ))
-            .expect("failed to append log")
-    });
+    write_log(
+        "_sign_dkim_public_key",
+        "[before calling get_dkim_public_key]",
+    );
     /// Fetch the public key from Google DNS.
     let (public_key,): (Result<String, String>,) = ic_cdk::api::call::call(
         dns_client_canister_id,
@@ -415,22 +365,15 @@ async fn _sign_dkim_public_key(
     )
     .await
     .map_err(|(code, e)| format!("dns_client canister error. {:?}, {}", code, e))?;
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _sign_dkim_public_key: [after calling get_dkim_public_key]"
-            ))
-            .expect("failed to append log")
-    });
+    write_log(
+        "_sign_dkim_public_key",
+        "[after calling get_dkim_public_key]",
+    );
     let public_key = public_key?;
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _sign_dkim_public_key: [fetched public key] {}",
-                public_key
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "_sign_dkim_public_key",
+        &format!("[fetched public key] {}", public_key),
+    );
     let poseidon_canister_id_str = CONFIG.with(|config| {
         config
             .borrow()
@@ -439,13 +382,7 @@ async fn _sign_dkim_public_key(
             .clone()
     });
     let poseidon_canister_id = Principal::from_text(poseidon_canister_id_str).unwrap();
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _sign_dkim_public_key: [before calling public_key_hash]"
-            ))
-            .expect("failed to append log")
-    });
+    write_log("_sign_dkim_public_key", "[before calling public_key_hash]");
     /// Compute the hash of the public key.
     let (res,): (Result<String, String>,) = ic_cdk::api::call::call(
         poseidon_canister_id,
@@ -454,49 +391,25 @@ async fn _sign_dkim_public_key(
     )
     .await
     .map_err(|(code, e)| format!("poseidon canister error. {:?}, {}", code, e))?;
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _sign_dkim_public_key: [after calling public_key_hash]"
-            ))
-            .expect("failed to append log")
-    });
+    write_log("_sign_dkim_public_key", "[after calling public_key_hash]");
     let public_key_hash_hex = res?;
     let message = format!(
         "SET:domain={};public_key_hash={};",
         domain, public_key_hash_hex
     );
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _sign_dkim_public_key: [signed message] {}",
-                message
-            ))
-            .expect("failed to append log");
-    });
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _sign_dkim_public_key: [before ic_evm_signing]"
-            ))
-            .expect("failed to append log")
-    });
+    write_log(
+        "_sign_dkim_public_key",
+        &format!("[signed message] {}", message),
+    );
+    write_log("_sign_dkim_public_key", "[before ic_evm_signing]");
     /// Sign the message.
     let signature =
         ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!("fn _sign_dkim_public_key: [after ic_evm_signing]"))
-            .expect("failed to append log")
-    });
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _sign_dkim_public_key: [signature] {}",
-                signature
-            ))
-            .expect("failed to append log");
-    });
+    write_log("_sign_dkim_public_key", "[after ic_evm_signing]");
+    write_log(
+        "_sign_dkim_public_key",
+        &format!("[signature] {}", signature),
+    );
     let res = SignedDkimPublicKey {
         selector,
         domain: domain.clone(),
@@ -522,25 +435,20 @@ pub async fn revoke_dkim_public_key(
     domain: String,
     private_key_der: String,
 ) -> Result<SignedRevocation, String> {
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn revoke_dkim_public_key: [input] selector {}, domain {}, private_key {}",
-                selector, domain, private_key_der
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "revoke_dkim_public_key",
+        &format!(
+            "[input] selector {}, domain {}, private_key {}",
+            selector, domain, private_key_der
+        ),
+    );
     let mut error0 = String::new();
     match _revoke_dkim_public_key(selector.clone(), domain.clone(), private_key_der.clone()).await {
         Ok(res) => {
-            LOG.with(|log| {
-                log.borrow_mut()
-                    .append(&format!(
-                        "fn revoke_dkim_public_key: [first try output] {:?}",
-                        res
-                    ))
-                    .expect("failed to append log");
-            });
+            write_log(
+                "revoke_dkim_public_key",
+                &format!("[first try output] {:?}", res),
+            );
             return Ok(res);
         }
         Err(e) => {
@@ -552,28 +460,26 @@ pub async fn revoke_dkim_public_key(
     let mut error1 = String::new();
     match _revoke_dkim_public_key(selector, domain_with_gappssmtp, private_key_der).await {
         Ok(res) => {
-            LOG.with(|log| {
-                log.borrow_mut()
-                    .append(&format!(
-                        "fn revoke_dkim_public_key: [first try error] {}, [second try output] {:?}",
-                        error0, res
-                    ))
-                    .expect("failed to append log");
-            });
+            write_log(
+                "revoke_dkim_public_key",
+                &format!(
+                    "[first try error] {}, [second try output] {:?}",
+                    error0, res
+                ),
+            );
             return Ok(res);
         }
         Err(e) => {
             error1 = e;
         }
     }
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn revoke_dkim_public_key: [first try error] {}, [second try error] {}",
-                error0, error1
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "revoke_dkim_public_key",
+        &format!(
+            "[first try error] {}, [second try error] {}",
+            error0, error1
+        ),
+    );
     Err(format!(
         "any revocation failed. error0: {}, error1: {}",
         error0, error1
@@ -588,14 +494,10 @@ async fn _revoke_dkim_public_key(
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     /// Accept all available cycles.
     ic_cdk::api::call::msg_cycles_accept128(available_cycles);
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [available cycles] {}",
-                available_cycles
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "_revoke_dkim_public_key",
+        &format!("[available cycles] {}", available_cycles),
+    );
     if CONFIG.with(|config| config.borrow().get(&0).is_none()) {
         return Err("ethereum address not found".to_string());
     }
@@ -607,14 +509,10 @@ async fn _revoke_dkim_public_key(
         assert!(public_key.e() == &BigUint::from(65537u64));
         "0x".to_string() + &hex::encode(&public_key.n().to_bytes_be())
     };
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [revoked public key] {}",
-                revoked_public_key
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "_revoke_dkim_public_key",
+        &format!("[revoked public key] {}", revoked_public_key),
+    );
     let dns_client_canister_id_str = CONFIG.with(|config| {
         config
             .borrow()
@@ -623,13 +521,10 @@ async fn _revoke_dkim_public_key(
             .clone()
     });
     let dns_client_canister_id = Principal::from_text(dns_client_canister_id_str).unwrap();
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [before calling get_dkim_public_key]"
-            ))
-            .expect("failed to append log")
-    });
+    write_log(
+        "_revoke_dkim_public_key",
+        "[before calling get_dkim_public_key]",
+    );
     /// Fetch the public key from Google DNS.
     let (fetched_public_key,): (Result<String, String>,) = ic_cdk::api::call::call(
         dns_client_canister_id,
@@ -638,22 +533,15 @@ async fn _revoke_dkim_public_key(
     )
     .await
     .map_err(|(code, e)| format!("dns_client canister error. {:?}, {}", code, e))?;
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [after calling get_dkim_public_key]"
-            ))
-            .expect("failed to append log")
-    });
+    write_log(
+        "_revoke_dkim_public_key",
+        "[after calling get_dkim_public_key]",
+    );
     let fetched_public_key = fetched_public_key?;
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [fetched public key] {}",
-                fetched_public_key
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "_revoke_dkim_public_key",
+        &format!("[fetched public key] {}", fetched_public_key),
+    );
     /// Check if the fetched public key matches with the derived public key.
     if revoked_public_key != fetched_public_key {
         return Err("public key mismatch".to_string());
@@ -666,13 +554,10 @@ async fn _revoke_dkim_public_key(
             .clone()
     });
     let poseidon_canister_id = Principal::from_text(poseidon_canister_id_str).unwrap();
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [before calling public_key_hash]"
-            ))
-            .expect("failed to append log")
-    });
+    write_log(
+        "_revoke_dkim_public_key",
+        "[before calling public_key_hash]",
+    );
     /// Compute the hash of the public key.
     let (res,): (Result<String, String>,) = ic_cdk::api::call::call(
         poseidon_canister_id,
@@ -681,51 +566,25 @@ async fn _revoke_dkim_public_key(
     )
     .await
     .map_err(|(code, e)| format!("poseidon canister failed. {:?}, {}", code, e))?;
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [after calling public_key_hash]"
-            ))
-            .expect("failed to append log")
-    });
+    write_log("_revoke_dkim_public_key", "[after calling public_key_hash]");
     let public_key_hash_hex = res?;
     let message = format!(
         "REVOKE:domain={};public_key_hash={};",
         domain, public_key_hash_hex
     );
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [signed message] {}",
-                message
-            ))
-            .expect("failed to append log");
-    });
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [before ic_evm_signing]"
-            ))
-            .expect("failed to append log");
-    });
+    write_log(
+        "_revoke_dkim_public_key",
+        &format!("[signed message] {}", message),
+    );
+    write_log("_revoke_dkim_public_key", "[before ic_evm_signing]");
     /// Sign the message.
     let signature =
         ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [after ic_evm_signing]"
-            ))
-            .expect("failed to append log");
-    });
-    LOG.with(|log| {
-        log.borrow_mut()
-            .append(&format!(
-                "fn _revoke_dkim_public_key: [signature] {}",
-                signature
-            ))
-            .expect("failed to append log");
-    });
+    write_log("_revoke_dkim_public_key", "[after ic_evm_signing]");
+    write_log(
+        "_revoke_dkim_public_key",
+        &format!("[signature] {}", signature),
+    );
     let res = SignedRevocation {
         selector,
         domain: domain.clone(),
@@ -742,6 +601,15 @@ async fn create_ethereum_address() -> Result<String, String> {
         .await
         .expect("create_address failed");
     Ok(res.address)
+}
+
+fn write_log(fn_name: &str, msg: &str) {
+    let current_time = ic_cdk::api::time();
+    LOG.with(|log| {
+        log.borrow_mut()
+            .append(&format!("[{}] fn {}: {}", current_time, fn_name, msg))
+            .expect("failed to append log");
+    });
 }
 
 ic_cdk::export_candid!();
