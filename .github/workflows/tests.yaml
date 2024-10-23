@@ -26,7 +26,7 @@ jobs:
         target: wasm32-unknown-unknown
     
     - name: Build rust to wasm
-      run: cargo build --target wasm32-unknown-unknown
+      run: cargo build --target wasm32-unknown-unknown --release
 
     - name: Run tests
       run: cargo test
