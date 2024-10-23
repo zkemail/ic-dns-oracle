@@ -482,7 +482,8 @@ async fn _sign_dkim_public_key(
             .expect("failed to append log")
     });
     /// Sign the message.
-    let signature = ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
+    let signature =
+        ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
     LOG.with(|log| {
         log.borrow_mut()
             .append(&format!("fn _sign_dkim_public_key: [after ic_evm_signing]"))
@@ -859,8 +860,7 @@ mod test {
         let reply = pic.await_call(call_id).unwrap();
         let signer_addr = match reply {
             WasmResult::Reply(data) => {
-                let res: String =
-                    decode_one(&data).unwrap();
+                let res: String = decode_one(&data).unwrap();
                 res
                 // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
@@ -928,8 +928,7 @@ mod test {
         println!("{:?}", reply);
         let res = match reply {
             WasmResult::Reply(data) => {
-                let res: Result<SignedDkimPublicKey, String> =
-                    decode_one(&data).unwrap();
+                let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
                 res.unwrap()
                 // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
@@ -946,16 +945,23 @@ mod test {
         let signature = hex::decode(&res.signature[2..]).unwrap();
         let signature_bytes: [u8; 64] = signature[0..64].try_into().unwrap();
         let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
-        let recovery_id = libsecp256k1::RecoveryId::parse(u8::try_from(signature[64]).unwrap() - 27).unwrap();
+        let recovery_id =
+            libsecp256k1::RecoveryId::parse(u8::try_from(signature[64]).unwrap() - 27).unwrap();
 
         let message = format!(
             "SET:domain={};public_key_hash={};",
             res.domain, res.public_key_hash
         );
         let message_hash = msg_to_hash(&message.as_bytes());
-        let public_key =
-        libsecp256k1::recover(&libsecp256k1::Message::parse(&message_hash), &signature_bytes_64, &recovery_id).unwrap();
-        let recovered_addr = ic_evm_sign::get_address_from_public_key(public_key.serialize_compressed().to_vec()).unwrap();
+        let public_key = libsecp256k1::recover(
+            &libsecp256k1::Message::parse(&message_hash),
+            &signature_bytes_64,
+            &recovery_id,
+        )
+        .unwrap();
+        let recovered_addr =
+            ic_evm_sign::get_address_from_public_key(public_key.serialize_compressed().to_vec())
+                .unwrap();
         println!("recovered_addr {:?}", recovered_addr);
         assert_eq!(recovered_addr.to_string(), signer_addr);
     }
