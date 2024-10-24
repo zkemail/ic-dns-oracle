@@ -12,6 +12,9 @@ use rsa::{
 };
 use serde_json::{self, Value};
 
+const SELECTOR_REGEX: &str = r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
+const DOMAIN_REGEX: &str = r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
+
 /// Fetches the DKIM public key for the given selector and domain.
 ///
 /// # Arguments
@@ -29,6 +32,14 @@ pub async fn get_dkim_public_key(
     domain: String,
     cycle: u64,
 ) -> Result<String, String> {
+    // Verify selector and domain
+    if !Regex::new(SELECTOR_REGEX).unwrap().is_match(&selector) {
+        return Err("Invalid domain".to_string());
+    }
+    if !Regex::new(DOMAIN_REGEX).unwrap().is_match(&domain) {
+        return Err("Invalid selector".to_string());
+    }
+
     let host = "dns.google";
     let url = format!(
         "https://{}/resolve?name={}._domainkey.{}&type=TXT",
@@ -532,6 +543,104 @@ mod test {
         };
         pic.mock_canister_http_response(mock_canister_http_response);
 
+        // Now the test canister will receive the http outcall response
+        // and reply to the ingress message from the test driver.
+        let reply = pic.await_call(call_id).unwrap();
+        println!("{:?}", reply);
+        match reply {
+            WasmResult::Reply(data) => {
+                let http_response: Result<String, String> = decode_one(&data).unwrap();
+                assert!(http_response.is_err());
+            }
+            WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
+        };
+        // There should be no more pending canister http outcalls.
+        let canister_http_requests = pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 0);
+    }
+
+    #[test]
+    fn test_dns_client_expect_error_invalid_selector() {
+        let pic = PocketIcBuilder::new()
+            .with_nns_subnet()
+            .with_ii_subnet() // this subnet has ECDSA keys
+            .with_application_subnet()
+            .build();
+
+        let topology = pic.topology();
+        let app_subnet = topology.get_app_subnets()[0];
+
+        // Create an empty canister as the anonymous principal and add cycles.
+        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
+        pic.add_cycles(canister_id, 2_000_000_000_000);
+        let wasm_bytes =
+            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
+                .to_vec();
+        pic.install_canister(canister_id, wasm_bytes, vec![], None);
+
+        // Submit an update call to the test canister making a canister http outcall
+        // and mock a canister http outcall response.
+        let selector = "20230601._domainkey.gmail.com&name=xx";
+        let domain = "any.com";
+        let call_id = pic
+            .submit_call(
+                canister_id,
+                Principal::anonymous(),
+                "get_dkim_public_key",
+                Encode!(&selector, &domain, &1_000_000_000_000u64).unwrap(),
+            )
+            .unwrap();
+        let canister_http_requests = pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 0);
+        // Now the test canister will receive the http outcall response
+        // and reply to the ingress message from the test driver.
+        let reply = pic.await_call(call_id).unwrap();
+        println!("{:?}", reply);
+        match reply {
+            WasmResult::Reply(data) => {
+                let http_response: Result<String, String> = decode_one(&data).unwrap();
+                assert!(http_response.is_err());
+            }
+            WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
+        };
+        // There should be no more pending canister http outcalls.
+        let canister_http_requests = pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 0);
+    }
+
+    #[test]
+    fn test_dns_client_expect_error_invalid_domain() {
+        let pic = PocketIcBuilder::new()
+            .with_nns_subnet()
+            .with_ii_subnet() // this subnet has ECDSA keys
+            .with_application_subnet()
+            .build();
+
+        let topology = pic.topology();
+        let app_subnet = topology.get_app_subnets()[0];
+
+        // Create an empty canister as the anonymous principal and add cycles.
+        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
+        pic.add_cycles(canister_id, 2_000_000_000_000);
+        let wasm_bytes =
+            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
+                .to_vec();
+        pic.install_canister(canister_id, wasm_bytes, vec![], None);
+
+        // Submit an update call to the test canister making a canister http outcall
+        // and mock a canister http outcall response.
+        let selector = "20230601";
+        let domain = ".gmail.com";
+        let call_id = pic
+            .submit_call(
+                canister_id,
+                Principal::anonymous(),
+                "get_dkim_public_key",
+                Encode!(&selector, &domain, &1_000_000_000_000u64).unwrap(),
+            )
+            .unwrap();
+        let canister_http_requests = pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 0);
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
