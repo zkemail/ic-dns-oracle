@@ -275,7 +275,10 @@ pub async fn sign_dkim_public_key(
         }
     }
     // Accept all available cycles.
-    ic_cdk::api::call::msg_cycles_accept128(available_cycles);
+    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(available_cycles);
+    if available_cycles != accepted_cycles {
+        return Err("Fail to accept all available cycles".to_string());
+    }
     write_log(
         "sign_dkim_public_key",
         &format!(
@@ -469,7 +472,10 @@ pub async fn revoke_dkim_public_key(
         }
     }
     // Accept all available cycles.
-    ic_cdk::api::call::msg_cycles_accept128(available_cycles);
+    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(available_cycles);
+    if available_cycles != accepted_cycles {
+        return Err("Fail to accept all available cycles".to_string());
+    }
     write_log(
         "revoke_dkim_public_key",
         &format!(

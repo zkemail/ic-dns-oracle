@@ -44,7 +44,10 @@ pub async fn get_dkim_public_key(
             return Err("Insufficient cycles".to_string());
         }
     }
-    ic_cdk::api::call::msg_cycles_accept128(available_cycles);
+    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(available_cycles);
+    if available_cycles != accepted_cycles {
+        return Err("Fail to accept all available cycles".to_string());
+    }
     // Verify selector and domain
     if !Regex::new(SELECTOR_REGEX).unwrap().is_match(&selector) {
         return Err("Invalid domain".to_string());
