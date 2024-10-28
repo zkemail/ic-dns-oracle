@@ -12,8 +12,13 @@ use rsa::{
 };
 use serde_json::{self, Value};
 
-const SELECTOR_REGEX: &str = r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
-const DOMAIN_REGEX: &str = r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
+const SELECTOR_REGEX: &str =
+    r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
+const DOMAIN_REGEX: &str =
+    r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
+// consumed cycle for get_dkim_public_key: 735_324_690 cycles
+// the consumed cycle * 1.5 is charged cycle = 1_102_987_035 cycles
+pub const CHARGED_CYCLE: u128 = 1_102_987_035;
 
 /// Fetches the DKIM public key for the given selector and domain.
 ///
@@ -32,6 +37,11 @@ pub async fn get_dkim_public_key(
     domain: String,
     cycle: u64,
 ) -> Result<String, String> {
+    let available_cycles = ic_cdk::api::call::msg_cycles_available128();
+    if available_cycles < CHARGED_CYCLE {
+        return Err("Insufficient cycles".to_string());
+    }
+    ic_cdk::api::call::msg_cycles_accept128(available_cycles);
     // Verify selector and domain
     if !Regex::new(SELECTOR_REGEX).unwrap().is_match(&selector) {
         return Err("Invalid domain".to_string());
