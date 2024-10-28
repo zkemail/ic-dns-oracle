@@ -11,7 +11,11 @@ Our repository contains the implementations of theee canisters as follows:
 
 ## How to try our canister
 Our IC DNS oracle backend canister is available at https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=fxmww-qiaaa-aaaaj-azu7a-cai.
-For example, by calling the `sign_dkim_public_key` with passing 20230601 and gmail.com as the first and second arguments, respectively, you can obtain the signature for the hash of the public key registered on DNS for the pair of the selector 20230601 and the domain gmail.com.
+Once you prepare your identity and wallet on ICP, you can obtain the signature for the hash of the public key registered on DNS for the pair of the selector 20230601 and the domain gmail.com by calling the following command:
+```
+dfx canister call fxmww-qiaaa-aaaaj-azu7a-cai sign_dkim_public_key '("20230601", "gmail.com")'  --network ic --with-cycles 39246898590 --wallet <YOUR_WALLET_CANISTER_ID>
+``` 
+
 You can verify it as the ECDSA signature from 0x6293a80bf4bd3fff995a0cab74cbf281d922da02, which is the signer's Ethereum address output by the `get_signer_ethereum_address` function.
 
 ## How to run tests
