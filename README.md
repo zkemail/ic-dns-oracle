@@ -18,7 +18,7 @@ You can verify it as the ECDSA signature from 0x6293a80bf4bd3fff995a0cab74cbf281
 First of all, you need to prepare the binary of `pocket-ic` according to the instruction [here](https://github.com/dfinity/pocketic?tab=readme-ov-file#download-the-pocketic-server).
 After you put the binary under the `ic-dns-oracle` directory or set the `POCKET_IC_BIN` to the path to that binary, you can run tests by the following commands:
 ```
-cargo build --target wasm32-unknown-unknown --release
+cargo build --target wasm32-unknown-unknown
 
 cargo test
 ``` 

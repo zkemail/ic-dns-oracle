@@ -38,8 +38,11 @@ pub async fn get_dkim_public_key(
     cycle: u64,
 ) -> Result<String, String> {
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
-    if available_cycles < CHARGED_CYCLE {
-        return Err("Insufficient cycles".to_string());
+    #[cfg(not(debug_assertions))]
+    {
+        if available_cycles < CHARGED_CYCLE {
+            return Err("Insufficient cycles".to_string());
+        }
     }
     ic_cdk::api::call::msg_cycles_accept128(available_cycles);
     // Verify selector and domain
@@ -232,10 +235,9 @@ mod test {
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
         pic.add_cycles(canister_id, 2_000_000_000_000);
         let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec();
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
         pic.install_canister(canister_id, wasm_bytes, vec![], None);
-
+        // let sender = pic.create_canister();
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
         let call_id = pic
@@ -322,8 +324,7 @@ mod test {
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
         pic.add_cycles(canister_id, 2_000_000_000_000);
         let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec();
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
         pic.install_canister(canister_id, wasm_bytes, vec![], None);
 
         // Submit an update call to the test canister making a canister http outcall
@@ -404,8 +405,7 @@ mod test {
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
         pic.add_cycles(canister_id, 2_000_000_000_000);
         let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec();
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
         pic.install_canister(canister_id, wasm_bytes, vec![], None);
 
         // Submit an update call to the test canister making a canister http outcall
@@ -494,8 +494,7 @@ mod test {
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
         pic.add_cycles(canister_id, 2_000_000_000_000);
         let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec();
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
         pic.install_canister(canister_id, wasm_bytes, vec![], None);
 
         // Submit an update call to the test canister making a canister http outcall
@@ -584,8 +583,7 @@ mod test {
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
         pic.add_cycles(canister_id, 2_000_000_000_000);
         let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec();
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
         pic.install_canister(canister_id, wasm_bytes, vec![], None);
 
         // Submit an update call to the test canister making a canister http outcall
@@ -633,8 +631,7 @@ mod test {
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
         pic.add_cycles(canister_id, 2_000_000_000_000);
         let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec();
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
         pic.install_canister(canister_id, wasm_bytes, vec![], None);
 
         // Submit an update call to the test canister making a canister http outcall

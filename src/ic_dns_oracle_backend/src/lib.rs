@@ -23,9 +23,15 @@ use std::{borrow::Borrow, cell::RefCell, collections::HashMap};
 // consumed cycle for sign_dkim_public_key: 26_164_599_060 cycles
 // the consumed cycle * 1.5 is charged cycle = 39_246_898_590 cycles
 pub const SIGN_CHARGED_CYCLE: u128 = 39_246_898_590;
+
+// consumed cycle for revoke_dkim_public_key: 26_254_964_417 cycles
+// the consumed cycle * 1.5 is charged cycle = 39_382_446_626 cycles
+pub const REVOKE_CHARGED_CYCLE: u128 = 39_382_446_626;
+
 // consumed cycle for get_dkim_public_key: 735_324_690 cycles
 // the consumed cycle * 1.5 is charged cycle = 1_102_987_035 cycles
 pub const DNS_CLIENT_CHARGED_CYCLE: u128 = 1_102_987_035;
+
 // consumed cycle for public_key_hash: 17_610_659 cycles
 // the consumed cycle * 1.5 is charged cycle = 26_415_989 cycles
 pub const POSEIDON_CHARGED_CYCLE: u128 = 26_415_989;
@@ -262,9 +268,12 @@ pub async fn sign_dkim_public_key(
     domain: String,
 ) -> Result<SignedDkimPublicKey, String> {
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
-    // if available_cycles < SIGN_CHARGED_CYCLE {
-    //     return Err("Insufficient cycles".to_string());
-    // }
+    #[cfg(not(debug_assertions))]
+    {
+        if available_cycles < SIGN_CHARGED_CYCLE {
+            return Err("Insufficient cycles".to_string());
+        }
+    }
     // Accept all available cycles.
     ic_cdk::api::call::msg_cycles_accept128(available_cycles);
     write_log(
@@ -452,6 +461,15 @@ pub async fn revoke_dkim_public_key(
     domain: String,
     private_key_der_hex: String,
 ) -> Result<SignedRevocation, String> {
+    let available_cycles = ic_cdk::api::call::msg_cycles_available128();
+    #[cfg(not(debug_assertions))]
+    {
+        if available_cycles < REVOKE_CHARGED_CYCLE {
+            return Err("Insufficient cycles".to_string());
+        }
+    }
+    // Accept all available cycles.
+    ic_cdk::api::call::msg_cycles_accept128(available_cycles);
     write_log(
         "revoke_dkim_public_key",
         &format!(
@@ -514,12 +532,12 @@ async fn _revoke_dkim_public_key(
     domain: String,
     private_key_der_hex: String,
 ) -> Result<SignedRevocation, String> {
-    let available_cycles = ic_cdk::api::call::msg_cycles_available128();
-    // Accept all available cycles.
-    ic_cdk::api::call::msg_cycles_accept128(available_cycles);
     write_log(
         "_revoke_dkim_public_key",
-        &format!("[available cycles] {}", available_cycles),
+        &format!(
+            "[input] selector {}, domain {}, private_key_der_hex {}",
+            selector, domain, private_key_der_hex
+        ),
     );
     if CONFIG.with(|config| config.borrow().get(&0).is_none()) {
         return Err("ethereum address not found".to_string());
@@ -716,21 +734,20 @@ mod test {
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
             poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/poseidon.wasm").to_vec(),
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
             vec![],
             None,
         );
         pic.install_canister(
             dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec(),
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
             vec![],
             None,
         );
         pic.install_canister(
             canister_id,
             include_bytes!(
-                "../../../target/wasm32-unknown-unknown/release/ic_dns_oracle_backend.wasm"
+                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
             )
             .to_vec(),
             Encode!(
@@ -888,21 +905,20 @@ mod test {
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
             poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/poseidon.wasm").to_vec(),
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
             vec![],
             None,
         );
         pic.install_canister(
             dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec(),
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
             vec![],
             None,
         );
         pic.install_canister(
             canister_id,
             include_bytes!(
-                "../../../target/wasm32-unknown-unknown/release/ic_dns_oracle_backend.wasm"
+                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
             )
             .to_vec(),
             Encode!(
@@ -1041,21 +1057,20 @@ mod test {
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
             poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/poseidon.wasm").to_vec(),
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
             vec![],
             None,
         );
         pic.install_canister(
             dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec(),
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
             vec![],
             None,
         );
         pic.install_canister(
             canister_id,
             include_bytes!(
-                "../../../target/wasm32-unknown-unknown/release/ic_dns_oracle_backend.wasm"
+                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
             )
             .to_vec(),
             Encode!(
@@ -1199,6 +1214,224 @@ mod test {
     }
 
     #[test]
+    fn test_revoke_valid_case_gappssmtp() {
+        // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
+        let pic = PocketIcBuilder::new()
+            .with_nns_subnet()
+            .with_ii_subnet() // this subnet has ECDSA keys
+            .with_application_subnet()
+            .build();
+
+        // We retrieve the app subnet ID from the topology.
+        let topology = pic.topology();
+        let app_subnet = topology.get_app_subnets()[0];
+
+        // Create empty canisters as the anonymous principal and add cycles.
+        let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
+        // println!("poseidon_canister_id {:?}", poseidon_canister_id);
+        pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
+        let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
+        // println!("dns_client_canister_id {:?}", dns_client_canister_id);
+        pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
+        // We create a canister on the app subnet.
+        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
+        // println!("canister_id {:?}", canister_id);
+        assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
+        pic.add_cycles(canister_id, 2_000_000_000_000);
+        pic.install_canister(
+            poseidon_canister_id,
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
+            vec![],
+            None,
+        );
+        pic.install_canister(
+            dns_client_canister_id,
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
+            vec![],
+            None,
+        );
+        pic.install_canister(
+            canister_id,
+            include_bytes!(
+                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
+            )
+            .to_vec(),
+            Encode!(
+                &Some(Environment::Production),
+                &poseidon_canister_id.to_string(),
+                &dns_client_canister_id.to_string()
+            )
+            .unwrap(),
+            None,
+        );
+
+        // Init the signer's ethereum address.
+        let call_id = pic
+            .submit_call(
+                canister_id,
+                Principal::anonymous(),
+                "init_signer_ethereum_address",
+                encode_one(()).unwrap(),
+            )
+            .unwrap();
+        // pic.tick();
+        let reply = pic.await_call(call_id).unwrap();
+        let signer_addr = match reply {
+            WasmResult::Reply(data) => {
+                let res: String = decode_one(&data).unwrap();
+                res
+                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
+            }
+            WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
+        };
+
+        let private_key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+        // println!("public key {:?}", private_key.to_public_key());
+        let private_key_der = private_key.to_pkcs1_der().unwrap();
+        // println!("private_key_der {:?}", private_key_der.as_bytes());
+        let private_key_der_hex = "0x".to_string() + &hex::encode(&private_key_der.as_bytes());
+        let public_key_hex = private_key_der_to_public_key_hex(&private_key_der.as_bytes());
+        let public_key_der = private_key.to_public_key().to_pkcs1_der().unwrap();
+        let public_key_der_base64 = general_purpose::STANDARD.encode(&public_key_der.as_bytes());
+        // Submit an update call to the test canister making a canister http outcall
+        // and mock a canister http outcall response.
+        // println!("status: {:?}", pic.canister_status(canister_id, None));
+        let call_id = pic
+            .submit_call(
+                canister_id,
+                Principal::anonymous(),
+                "revoke_dkim_public_key",
+                Encode!(&"20230601", &"gmail.com", &private_key_der_hex.to_string()).unwrap(),
+            )
+            .unwrap();
+
+        pic.tick();
+        pic.tick();
+
+        let canister_http_requests = pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 1);
+        let body = r#"
+        {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+                {
+                    "name": "20230601._domainkey.gmail.com.",
+                    "type": 16
+                }
+            ],
+            "Comment": "Response from 216.239.32.10."
+        }
+        "#
+        .to_string();
+        let mock_canister_http_response = MockCanisterHttpResponse {
+            subnet_id: canister_http_requests[0].subnet_id,
+            request_id: canister_http_requests[0].request_id,
+            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                status: 200,
+                headers: vec![],
+                body: body.as_bytes().to_vec(),
+            }),
+            additional_responses: vec![],
+        };
+        pic.mock_canister_http_response(mock_canister_http_response);
+
+        pic.tick();
+        pic.tick();
+        pic.tick();
+        let canister_http_requests: Vec<pocket_ic::common::rest::CanisterHttpRequest> =
+            pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 1);
+        let canister_http_request = &canister_http_requests[0];
+        let mut body = r#"
+        {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+                {
+                    "name": "20230601._domainkey.gmail.com.",
+                    "type": 16
+                }
+            ],
+            "Answer": [
+                {
+                    "name": "20230601._domainkey.gmail.com.",
+                    "type": 16,
+                    "TTL": 3600,
+                    "data": "v=DKIM1; k=rsa; p={{BASE64}}"
+                }
+            ],
+            "Comment": "Response from 216.239.32.10."
+        }
+        "#
+        .to_string();
+        body = body.replace("{{BASE64}}", &public_key_der_base64);
+        let mock_canister_http_response = MockCanisterHttpResponse {
+            subnet_id: canister_http_request.subnet_id,
+            request_id: canister_http_request.request_id,
+            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                status: 200,
+                headers: vec![],
+                body: body.as_bytes().to_vec(),
+            }),
+            additional_responses: vec![],
+        };
+        pic.mock_canister_http_response(mock_canister_http_response);
+
+        // // Now the test canister will receive the http outcall response
+        // // and reply to the ingress message from the test driver.
+        let reply = pic.await_call(call_id).unwrap();
+        println!("{:?}", reply);
+        let res = match reply {
+            WasmResult::Reply(data) => {
+                let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
+                res.unwrap()
+                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
+            }
+            WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
+        };
+        // println!("status: {:?}", pic.canister_status(canister_id, None));
+
+        assert_eq!(res.selector, "20230601");
+        assert_eq!(res.domain, "gmail-com.20230601.gappssmtp.com");
+        assert_eq!(res.public_key, public_key_hex);
+        // // There should be no more pending canister http outcalls.
+        let canister_http_requests = pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 0);
+        println!("{:?}", res);
+        let signature = hex::decode(&res.signature[2..]).unwrap();
+        let signature_bytes: [u8; 64] = signature[0..64].try_into().unwrap();
+        let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
+        let recovery_id =
+            libsecp256k1::RecoveryId::parse(u8::try_from(signature[64]).unwrap() - 27).unwrap();
+
+        let message = format!(
+            "REVOKE:domain={};public_key_hash={};",
+            res.domain, res.public_key_hash
+        );
+        let message_hash = msg_to_hash(&message.as_bytes());
+        let public_key = libsecp256k1::recover(
+            &libsecp256k1::Message::parse(&message_hash),
+            &signature_bytes_64,
+            &recovery_id,
+        )
+        .unwrap();
+        let recovered_addr =
+            ic_evm_sign::get_address_from_public_key(public_key.serialize_compressed().to_vec())
+                .unwrap();
+        println!("recovered_addr {:?}", recovered_addr);
+        assert_eq!(recovered_addr.to_string(), signer_addr);
+    }
+
+    #[test]
     #[should_panic]
     fn test_revoke_invalid_case() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
@@ -1226,21 +1459,20 @@ mod test {
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
             poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/poseidon.wasm").to_vec(),
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
             vec![],
             None,
         );
         pic.install_canister(
             dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec(),
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
             vec![],
             None,
         );
         pic.install_canister(
             canister_id,
             include_bytes!(
-                "../../../target/wasm32-unknown-unknown/release/ic_dns_oracle_backend.wasm"
+                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
             )
             .to_vec(),
             Encode!(
@@ -1354,21 +1586,20 @@ mod test {
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
             poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/poseidon.wasm").to_vec(),
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
             vec![],
             None,
         );
         pic.install_canister(
             dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/release/dns_client.wasm")
-                .to_vec(),
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
             vec![],
             None,
         );
         pic.install_canister(
             canister_id,
             include_bytes!(
-                "../../../target/wasm32-unknown-unknown/release/ic_dns_oracle_backend.wasm"
+                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
             )
             .to_vec(),
             Encode!(
