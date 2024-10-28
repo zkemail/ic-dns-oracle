@@ -30,3 +30,6 @@ cargo test
 - [ic-cdk](https://docs.rs/ic-cdk)
 - [ic-cdk-macros](https://docs.rs/ic-cdk-macros)
 - [Candid Introduction](https://internetcomputer.org/docs/candid-guide/candid-intro)
+
+## Acknowledgment
+We sincerely thank [Clank Pan](https://x.com/clankpan) for generously sharing insights and feedback on ICP, which helped us improve our library.
