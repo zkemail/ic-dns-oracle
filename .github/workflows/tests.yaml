@@ -1,0 +1,32 @@
+name: Unit Tests
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install PocketIC server
+      uses: dfinity/pocketic@main
+      with:
+        pocket-ic-server-version: '6.0.0'
+
+    - name: Confirm successful installation
+      run: ${{ env.POCKET_IC_BIN }} --version
+
+    - name: Setup Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: 1.78.0
+        override: true
+        components: rustfmt, clippy
+        target: wasm32-unknown-unknown
+    
+    - name: Build rust to wasm
+      run: cargo build --target wasm32-unknown-unknown
+
+    - name: Run tests
+      run: cargo test

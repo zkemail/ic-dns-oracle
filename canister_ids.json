@@ -1,14 +1,11 @@
 {
   "dns_client": {
-    "ic": "qwhju-vqaaa-aaaak-qdbjq-cai"
+    "ic": "oo3c4-gyaaa-aaaaj-azvaa-cai"
   },
   "ic_dns_oracle_backend": {
-    "ic": "q7eci-dyaaa-aaaak-qdbia-cai"
-  },
-  "ic_dns_oracle_frontend": {
-    "ic": "qrgpa-yiaaa-aaaak-qdbja-cai"
+    "ic": "fxmww-qiaaa-aaaaj-azu7a-cai"
   },
   "poseidon": {
-    "ic": "qyfe4-oaaaa-aaaak-qdbiq-cai"
+    "ic": "fqnqc-5qaaa-aaaaj-azu7q-cai"
   }
 }

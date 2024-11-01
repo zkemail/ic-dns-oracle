@@ -4,32 +4,22 @@
       "candid": "src/ic_dns_oracle_backend/ic_dns_oracle_backend.did",
       "package": "ic_dns_oracle_backend",
       "type": "rust",
-      "optimize": "size"
+      "optimize": "size",
+      "gzip": true
     },
     "poseidon": {
       "candid": "src/poseidon/poseidon.did",
       "package": "poseidon",
       "type": "rust",
-      "optimize": "size"
+      "optimize": "size",
+      "gzip": true
     },
     "dns_client": {
       "candid": "src/dns_client/dns_client.did",
       "package": "dns_client",
       "type": "rust",
-      "optimize": "size"
-    },
-    "ic_dns_oracle_frontend": {
-      "dependencies": [
-        "ic_dns_oracle_backend"
-      ],
-      "frontend": {
-        "entrypoint": "src/ic_dns_oracle_frontend/src/index.html"
-      },
-      "source": [
-        "src/ic_dns_oracle_frontend/assets",
-        "dist/ic_dns_oracle_frontend/"
-      ],
-      "type": "assets"
+      "optimize": "size",
+      "gzip": true
     }
   },
   "defaults": {
