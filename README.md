@@ -27,6 +27,17 @@ cargo build --target wasm32-unknown-unknown
 cargo test
 ``` 
 
+## Fees for DDoS Protection
+To protect our canisters against DDoS attacks, their update functions require the caller to pay specific amounts of cycles as fees.
+Specifically, each function requires the following amount of cycles.
+
+| Function Name | Required Cycles |
+|---------------|-----------------|
+| public_key_hash | 26415989      |
+| get_dkim_public_key | 1102987035 |
+| sign_dkim_public_key | 39246898590 |
+| revoke_dkim_public_key | 39382446626 |
+
 ## References
 - [Quick Start](https://internetcomputer.org/docs/quickstart/quickstart-intro)
 - [SDK Developer Tools](https://internetcomputer.org/docs/developers-guide/sdk-guide)
