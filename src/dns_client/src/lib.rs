@@ -56,53 +56,37 @@ pub async fn get_dkim_public_key(
         return Err("Invalid selector".to_string());
     }
 
-    let host = "dns.google";
-    let url = format!(
-        "https://{}/resolve?name={}._domainkey.{}&type=TXT",
-        host, selector, domain
-    );
-
-    let request_headers = vec![
-        HttpHeader {
-            name: "Host".to_string(),
-            value: format!("{host}:443"),
-        },
-        HttpHeader {
-            name: "User-Agent".to_string(),
-            value: "exchange_rate_canister".to_string(),
-        },
+    let prefixes = vec![
+        "https://dns.google/resolve",
+        "https://cloudflare-dns.com/dns-query",
+        "https://dns.nextdns.io/dns-query",
     ];
 
-    let transform = TransformContext::from_name("transform".to_string(), vec![]);
-    let request = CanisterHttpRequestArgument {
-        url: url.to_string(),
-        method: HttpMethod::GET,
-        body: None,                      // Optional for request
-        max_response_bytes: Some(65536), // 64KB
-        transform: Some(transform),
-        headers: request_headers,
-    };
-
-    match http_request(request, cycle as u128).await {
-        // Decode and return the response.
-        Ok((response,)) => {
-            if response.status != Nat::from(200u64) {
-                return Err(format!(
-                    "Received an error from google dns: err = {:?}",
-                    response.body
-                ));
+    let mut errors = vec![];
+    for prefix in prefixes {
+        let request = _construct_request(prefix, &selector, &domain);
+        match http_request(request, cycle as u128).await {
+            // Decode and return the response.
+            Ok((response,)) => {
+                if response.status != Nat::from(200u64) {
+                    continue;
+                }
+                let pubkey_hex = "0x".to_string() + &hex::encode(&response.body);
+                return Ok(pubkey_hex);
             }
-            let pubkey_hex = "0x".to_string() + &hex::encode(&response.body);
-            Ok(pubkey_hex)
-        }
-        Err((r, m)) => {
-            let message =
-                format!("The http_request resulted into error. RejectionCode: {r:?}, Error: {m}");
+            Err((r, m)) => {
+                let message = format!(
+                    "[Access to {prefix}] The http_request resulted into error. RejectionCode: {r:?}, Error: {m}."
+                );
+                errors.push(message);
 
-            // Return the error as a string and end the method.
-            Err(message)
+                // Return the error as a string and end the method.
+                // return Err(message);
+            }
         }
     }
+    // Return the error as a string and end the method.
+    return Err(errors.join("\n"));
 }
 
 /// Transforms the raw HTTP response into a structured `HttpResponse`.
@@ -119,6 +103,35 @@ fn transform(raw: TransformArgs) -> HttpResponse {
     match _transform(raw) {
         Ok(res) => res,
         Err(e) => panic!("{}", e),
+    }
+}
+
+/// Helper function to construct the HTTP request.
+/// # Arguments
+/// * `prefix` - The prefix of the DNS resolver.
+/// * `selector` - The DKIM selector.
+/// * `domain` - The domain for which to fetch the DKIM public key.
+/// # Returns
+/// A structured `CanisterHttpRequestArgument`.
+fn _construct_request(prefix: &str, selector: &str, domain: &str) -> CanisterHttpRequestArgument {
+    let url = format!(
+        "{}?name={}._domainkey.{}&type=TXT",
+        prefix, selector, domain
+    );
+
+    let request_headers = vec![HttpHeader {
+        name: "Accept".to_string(),
+        value: "application/dns-json".to_string(),
+    }];
+
+    let transform = TransformContext::from_name("transform".to_string(), vec![]);
+    CanisterHttpRequestArgument {
+        url: url.to_string(),
+        method: HttpMethod::GET,
+        body: None,                      // Optional for request
+        max_response_bytes: Some(65536), // 64KB
+        transform: Some(transform),
+        headers: request_headers,
     }
 }
 

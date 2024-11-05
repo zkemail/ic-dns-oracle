@@ -6,7 +6,7 @@ For example, this is used in ZK Email to update a dkim registry contract, which 
 
 Our repository contains the implementations of theee canisters as follows:
 - Poseidon hash canister: this simply computes the Poseidon hash of the given RSA public key.
-- DNS client canister: this fetches an RSA public key for the given selector and domain from Google DNS.
+- DNS client canister: this fetches an RSA public key for the given selector and domain from either Google DNS, Cloudflare DNS, or Next DNS.
 - IC DNS oracle backend canister: this is our main canister that generates an ECDSA signature for the fetched public key corresponding to the given selector and domain. The output signature can be verified by smart contracts on Ethereum.
 
 ## How to try our canister
