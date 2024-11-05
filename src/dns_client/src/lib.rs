@@ -59,15 +59,21 @@ pub async fn get_dkim_public_key(
     #[cfg(not(debug_assertions))]
     let prefixes = vec![
         "https://dns.google/resolve",
-        "https://dns.nextdns.io/dns-query",
         "https://cloudflare-dns.com/dns-query",
+        "https://dns.nextdns.io/dns-query",
     ];
 
     #[cfg(debug_assertions)]
     let prefixes = vec!["https://dns.google/resolve"];
 
+    let seed = (ic_cdk::api::time() % 3) as usize;
+    let mut shuffled_prefixes = vec![];
+    for i in 0..3 {
+        shuffled_prefixes.push(prefixes[(seed + i) % 3]);
+    }
+
     let mut errors = vec![];
-    for prefix in prefixes {
+    for prefix in shuffled_prefixes {
         let request = _construct_request(prefix, &selector, &domain);
         match http_request(request, cycle as u128).await {
             // Decode and return the response.
