@@ -66,10 +66,10 @@ pub async fn get_dkim_public_key(
     #[cfg(debug_assertions)]
     let prefixes = vec!["https://dns.google/resolve"];
 
-    let seed = (ic_cdk::api::time() % 3) as usize;
+    let seed = ic_cdk::api::time() as usize % prefixes.len();
     let mut shuffled_prefixes = vec![];
     for i in 0..3 {
-        shuffled_prefixes.push(prefixes[(seed + i) % 3]);
+        shuffled_prefixes.push(prefixes[(seed + i) % prefixes.len()]);
     }
 
     let mut errors = vec![];
