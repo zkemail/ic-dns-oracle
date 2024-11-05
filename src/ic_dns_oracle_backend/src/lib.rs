@@ -717,7 +717,6 @@ mod test {
     fn test_sign_gmail() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -889,7 +888,6 @@ mod test {
     fn test_sign_gappssmtp() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -1042,7 +1040,6 @@ mod test {
     fn test_revoke_valid_case() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -1226,7 +1223,6 @@ mod test {
     fn test_revoke_valid_case_gappssmtp() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -1442,11 +1438,9 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
     fn test_revoke_invalid_case() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -1567,14 +1561,41 @@ mod test {
             additional_responses: vec![],
         };
         pic.mock_canister_http_response(mock_canister_http_response);
-        pic.await_call(call_id).unwrap();
+
+        pic.tick();
+        pic.tick();
+        pic.tick();
+        let canister_http_requests: Vec<pocket_ic::common::rest::CanisterHttpRequest> =
+            pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 1);
+        let canister_http_request = &canister_http_requests[0];
+        let mock_canister_http_response = MockCanisterHttpResponse {
+            subnet_id: canister_http_request.subnet_id,
+            request_id: canister_http_request.request_id,
+            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                status: 200,
+                headers: vec![],
+                body: body.as_bytes().to_vec(),
+            }),
+            additional_responses: vec![],
+        };
+        pic.mock_canister_http_response(mock_canister_http_response);
+
+        let reply = pic.await_call(call_id).unwrap();
+        println!("{:?}", reply);
+        match reply {
+            WasmResult::Reply(data) => {
+                let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
+                assert!(res.is_err());
+            }
+            WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
+        };
     }
 
     #[test]
     fn test_sign_gmail_invalid_selector() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()

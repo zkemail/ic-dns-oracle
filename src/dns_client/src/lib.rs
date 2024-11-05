@@ -249,7 +249,6 @@ mod test {
     #[test]
     fn test_dns_client_gmail() {
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -339,7 +338,6 @@ mod test {
     #[test]
     fn test_dns_client_expect_error_no_answer() {
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -421,7 +419,6 @@ mod test {
     #[test]
     fn test_dns_client_expect_error_invalid_key_type() {
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -511,7 +508,6 @@ mod test {
     #[test]
     fn test_dns_client_expect_error_invalid_base64_format() {
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -601,7 +597,6 @@ mod test {
     #[test]
     fn test_dns_client_expect_error_invalid_selector() {
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -650,7 +645,6 @@ mod test {
     #[test]
     fn test_dns_client_expect_error_invalid_domain() {
         let pic = PocketIcBuilder::new()
-            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
