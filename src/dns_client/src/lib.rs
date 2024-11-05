@@ -16,8 +16,8 @@ const SELECTOR_REGEX: &str =
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
 const DOMAIN_REGEX: &str =
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
-// consumed cycle for get_dkim_public_key: 735_324_690 cycles
-// the consumed cycle * 1.5 is charged cycle = 1_102_987_035 cycles
+// consumed cycle for get_dkim_public_key: 745_646_986 cycles
+// the consumed cycle * 1.479 is charged cycle = 1_102_987_035 cycles
 pub const CHARGED_CYCLE: u128 = 1_102_987_035;
 
 /// Fetches the DKIM public key for the given selector and domain.
