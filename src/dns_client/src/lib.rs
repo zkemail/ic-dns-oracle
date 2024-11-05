@@ -68,7 +68,7 @@ pub async fn get_dkim_public_key(
 
     let seed = ic_cdk::api::time() as usize % prefixes.len();
     let mut shuffled_prefixes = vec![];
-    for i in 0..3 {
+    for i in 0..prefixes.len() {
         shuffled_prefixes.push(prefixes[(seed + i) % prefixes.len()]);
     }
 
