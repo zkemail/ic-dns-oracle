@@ -56,11 +56,14 @@ pub async fn get_dkim_public_key(
         return Err("Invalid selector".to_string());
     }
 
+    #[cfg(not(debug_assertions))]
     let prefixes = vec![
         "https://cloudflare-dns.com/dns-query",
         "https://dns.google/resolve",
         "https://dns.nextdns.io/dns-query",
     ];
+    #[cfg(debug_assertions)]
+    let prefixes = vec!["https://dns.google/resolve"];
 
     let mut errors = vec![];
     for prefix in prefixes {
@@ -79,7 +82,7 @@ pub async fn get_dkim_public_key(
                     "[Access to {prefix}] The http_request resulted into error. RejectionCode: {r:?}, Error: {m}."
                 );
                 errors.push(message);
-
+                continue;
                 // Return the error as a string and end the method.
                 // return Err(message);
             }
@@ -102,7 +105,12 @@ pub async fn get_dkim_public_key(
 fn transform(raw: TransformArgs) -> HttpResponse {
     match _transform(raw) {
         Ok(res) => res,
-        Err(e) => panic!("{}", e),
+        Err(e) => HttpResponse {
+            status: Nat::from(500u64),
+            body: e.as_bytes().to_vec(),
+            headers: _transform_headers(),
+            ..Default::default()
+        },
     }
 }
 
@@ -145,33 +153,6 @@ fn _construct_request(prefix: &str, selector: &str, domain: &str) -> CanisterHtt
 ///
 /// A result containing the structured `HttpResponse`, or an error message.
 fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
-    let headers = vec![
-        HttpHeader {
-            name: "Content-Security-Policy".to_string(),
-            value: "default-src 'self'".to_string(),
-        },
-        HttpHeader {
-            name: "Referrer-Policy".to_string(),
-            value: "strict-origin".to_string(),
-        },
-        HttpHeader {
-            name: "Permissions-Policy".to_string(),
-            value: "geolocation=(self)".to_string(),
-        },
-        HttpHeader {
-            name: "Strict-Transport-Security".to_string(),
-            value: "max-age=63072000".to_string(),
-        },
-        HttpHeader {
-            name: "X-Frame-Options".to_string(),
-            value: "DENY".to_string(),
-        },
-        HttpHeader {
-            name: "X-Content-Type-Options".to_string(),
-            value: "nosniff".to_string(),
-        },
-    ];
-
     if raw.response.status != Nat::from(200u64) {
         return Err(format!(
             "Received an error with code {} from google dns: err = {:?}",
@@ -209,12 +190,41 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
             return Ok(HttpResponse {
                 status: raw.response.status.clone(),
                 body: pubkey_bytes.n().to_bytes_be(),
-                headers,
+                headers: _transform_headers(),
                 ..Default::default()
             });
         }
     }
     Err("No key found".to_string())
+}
+
+fn _transform_headers() -> Vec<HttpHeader> {
+    vec![
+        HttpHeader {
+            name: "Content-Security-Policy".to_string(),
+            value: "default-src 'self'".to_string(),
+        },
+        HttpHeader {
+            name: "Referrer-Policy".to_string(),
+            value: "strict-origin".to_string(),
+        },
+        HttpHeader {
+            name: "Permissions-Policy".to_string(),
+            value: "geolocation=(self)".to_string(),
+        },
+        HttpHeader {
+            name: "Strict-Transport-Security".to_string(),
+            value: "max-age=63072000".to_string(),
+        },
+        HttpHeader {
+            name: "X-Frame-Options".to_string(),
+            value: "DENY".to_string(),
+        },
+        HttpHeader {
+            name: "X-Content-Type-Options".to_string(),
+            value: "nosniff".to_string(),
+        },
+    ]
 }
 
 ic_cdk::export_candid!();
