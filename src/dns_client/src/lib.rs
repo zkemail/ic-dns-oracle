@@ -58,10 +58,11 @@ pub async fn get_dkim_public_key(
 
     #[cfg(not(debug_assertions))]
     let prefixes = vec![
-        "https://cloudflare-dns.com/dns-query",
         "https://dns.google/resolve",
         "https://dns.nextdns.io/dns-query",
+        "https://cloudflare-dns.com/dns-query",
     ];
+
     #[cfg(debug_assertions)]
     let prefixes = vec!["https://dns.google/resolve"];
 
@@ -72,6 +73,11 @@ pub async fn get_dkim_public_key(
             // Decode and return the response.
             Ok((response,)) => {
                 if response.status != Nat::from(200u64) {
+                    let message = format!(
+                        "[Access to {prefix}] The response status is {}.",
+                        response.status
+                    );
+                    errors.push(message);
                     continue;
                 }
                 let pubkey_hex = "0x".to_string() + &hex::encode(&response.body);
@@ -83,8 +89,6 @@ pub async fn get_dkim_public_key(
                 );
                 errors.push(message);
                 continue;
-                // Return the error as a string and end the method.
-                // return Err(message);
             }
         }
     }
@@ -155,7 +159,7 @@ fn _construct_request(prefix: &str, selector: &str, domain: &str) -> CanisterHtt
 fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
     if raw.response.status != Nat::from(200u64) {
         return Err(format!(
-            "Received an error with code {} from google dns: err = {:?}",
+            "Received an error with code {} from the dns service: err = {:?}",
             raw.response.status, raw.response.body
         ));
     }
@@ -166,15 +170,21 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
         .to_vec();
     for i in 0..answers.len() {
         let data = answers[i]["data"].to_string();
-        if let Some(k) = Regex::new("k=[a-z]+").unwrap().find(&data) {
-            if k.as_str() != "k=rsa" {
+        if let Some(k_caps) = Regex::new("k=([a-z]+)").unwrap().captures(&data) {
+            if &k_caps[1] != "rsa" {
                 continue;
             }
         }
-        if let Some(pubkey_base64) = Regex::new("p=[A-Za-z0-9\\+/]+").unwrap().find(&data) {
-            let pubkey_base64 = pubkey_base64.as_str();
+
+        if let Some(p_caps) = Regex::new(r#"p=([A-Za-z0-9\\+/" ]+);?"#)
+            .unwrap()
+            .captures(&data)
+        {
+            let remove_regex = Regex::new(r#"["\\ ]"#).unwrap();
+            let pubkey_base64 = p_caps.get(1).unwrap().as_str();
+            let pubkey_base64 = remove_regex.replace_all(pubkey_base64, "").to_string();
             let pubkey_pkcs = general_purpose::STANDARD
-                .decode(&pubkey_base64.to_string()[2..])
+                .decode(&pubkey_base64)
                 .map_err(|e| {
                     format!(
                         "base64 decode of {} failed: {}",
@@ -189,7 +199,7 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
             };
             return Ok(HttpResponse {
                 status: raw.response.status.clone(),
-                body: pubkey_bytes.n().to_bytes_be(),
+                body: pubkey_bytes.n().to_bytes_be().to_vec(),
                 headers: _transform_headers(),
                 ..Default::default()
             });
