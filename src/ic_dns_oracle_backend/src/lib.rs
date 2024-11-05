@@ -717,6 +717,7 @@ mod test {
     fn test_sign_gmail() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
+            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -888,6 +889,7 @@ mod test {
     fn test_sign_gappssmtp() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
+            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -1040,6 +1042,7 @@ mod test {
     fn test_revoke_valid_case() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
+            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -1223,6 +1226,7 @@ mod test {
     fn test_revoke_valid_case_gappssmtp() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
+            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -1442,6 +1446,7 @@ mod test {
     fn test_revoke_invalid_case() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
+            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
@@ -1569,6 +1574,7 @@ mod test {
     fn test_sign_gmail_invalid_selector() {
         // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
         let pic = PocketIcBuilder::new()
+            .with_max_request_time_ms(None)
             .with_nns_subnet()
             .with_ii_subnet() // this subnet has ECDSA keys
             .with_application_subnet()
