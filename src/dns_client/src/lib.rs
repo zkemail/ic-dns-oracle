@@ -24,16 +24,10 @@ pub async fn get_dkim_public_key(
         host, selector, domain
     );
 
-    let request_headers = vec![
-        HttpHeader {
-            name: "Host".to_string(),
-            value: format!("{host}:443"),
-        },
-        HttpHeader {
-            name: "User-Agent".to_string(),
-            value: "exchange_rate_canister".to_string(),
-        },
-    ];
+    let request_headers = vec![HttpHeader {
+        name: "Accept".to_string(),
+        value: "application/dns-json".to_string(),
+    }];
 
     // let context = Context {
     //     bucket_start_time_index: 0,

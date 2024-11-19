@@ -5,9 +5,6 @@
   "ic_dns_oracle_backend": {
     "ic": "q7eci-dyaaa-aaaak-qdbia-cai"
   },
-  "ic_dns_oracle_frontend": {
-    "ic": "qrgpa-yiaaa-aaaak-qdbja-cai"
-  },
   "poseidon": {
     "ic": "qyfe4-oaaaa-aaaak-qdbiq-cai"
   }

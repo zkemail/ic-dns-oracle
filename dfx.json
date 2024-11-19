@@ -17,19 +17,6 @@
       "package": "dns_client",
       "type": "rust",
       "optimize": "size"
-    },
-    "ic_dns_oracle_frontend": {
-      "dependencies": [
-        "ic_dns_oracle_backend"
-      ],
-      "frontend": {
-        "entrypoint": "src/ic_dns_oracle_frontend/src/index.html"
-      },
-      "source": [
-        "src/ic_dns_oracle_frontend/assets",
-        "dist/ic_dns_oracle_frontend/"
-      ],
-      "type": "assets"
     }
   },
   "defaults": {

@@ -2,11 +2,11 @@ use ff::PrimeField;
 use hex;
 use poseidon_rs::*;
 
-#[ic_cdk::inspect_message]
-fn inspect_message() {
-    ic_cdk::api::call::reject_message();
-    panic!("call from users is not allowed");
-}
+// #[ic_cdk::inspect_message]
+// fn inspect_message() {
+//     ic_cdk::api::call::reject_message();
+//     panic!("call from users is not allowed");
+// }
 
 #[ic_cdk::update]
 pub fn public_key_hash(public_key_hex: String) -> Result<String, String> {
