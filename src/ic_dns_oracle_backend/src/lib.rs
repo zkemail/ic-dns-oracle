@@ -23,9 +23,8 @@ use std::{cell::RefCell, collections::HashMap};
 mod utils;
 use candid::utils::*;
 // use ic_cdk::api::management_canister::main::*;
-use utils::*;
 use ic_exports::*;
-
+use utils::*;
 
 #[derive(Default, CandidType, Deserialize, Debug, Clone)]
 pub struct SignedDkimPublicKey {
@@ -59,7 +58,11 @@ pub struct DomainState {
 }
 
 #[ic_cdk::init]
-pub fn init(evn_opt: Option<Environment>, poseidon_canister_id: String, dns_client_canister_id: String) {
+pub fn init(
+    evn_opt: Option<Environment>,
+    poseidon_canister_id: String,
+    dns_client_canister_id: String,
+) {
     ic_evm_sign::init(evn_opt.clone());
     let state = CanisterState::get();
     state.borrow_mut().poseidon_canister_id = poseidon_canister_id;
@@ -77,9 +80,10 @@ pub async fn sign_dkim_public_key(
     selector: String,
     domain: String,
 ) -> Result<SignedDkimPublicKey, String> {
-    let domain_with_gappssmtp = format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);
+    let domain_with_gappssmtp =
+        format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);
     let mut error0 = String::new();
-    match _sign_dkim_public_key(selector.clone(), domain).await {
+    match _sign_dkim_public_key(selector.clone(), domain.clone(), domain.clone()).await {
         Ok(res) => {
             return Ok(res);
         }
@@ -88,7 +92,7 @@ pub async fn sign_dkim_public_key(
         }
     }
     let mut error1 = String::new();
-    match _sign_dkim_public_key(selector, domain_with_gappssmtp).await {
+    match _sign_dkim_public_key(selector, domain_with_gappssmtp, domain).await {
         Ok(res) => {
             return Ok(res);
         }
@@ -96,13 +100,17 @@ pub async fn sign_dkim_public_key(
             error1 = e;
         }
     }
-    Err(format!("any signing failed. error0: {}, error1: {}", error0, error1))
+    Err(format!(
+        "any signing failed. error0: {}, error1: {}",
+        error0, error1
+    ))
 }
 
 #[ic_cdk::update]
 async fn _sign_dkim_public_key(
     selector: String,
     domain: String,
+    signed_domain: String,
 ) -> Result<SignedDkimPublicKey, String> {
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     ic_cdk::api::call::msg_cycles_accept128(available_cycles);
@@ -113,11 +121,11 @@ async fn _sign_dkim_public_key(
         canister_state.address = address.clone();
     }
     let dns_client_canister_id =
-    Principal::from_text(canister_state.dns_client_canister_id.clone()).unwrap();
+        Principal::from_text(canister_state.dns_client_canister_id.clone()).unwrap();
     let (public_key,): (Result<String, String>,) = ic_cdk::api::call::call(
         dns_client_canister_id,
         "get_dkim_public_key",
-        (&selector, &domain, 40_000_000_000u64, ),
+        (&selector, &domain, 40_000_000_000u64),
     )
     .await
     .map_err(|(code, e)| format!("dns_client canister error. {:?}, {}", code, e))?;
@@ -135,14 +143,14 @@ async fn _sign_dkim_public_key(
     let public_key_hash_hex = res?;
     let message = format!(
         "SET:selector={};domain={};public_key_hash={};",
-        selector, domain, public_key_hash_hex
+        selector, signed_domain, public_key_hash_hex
     );
     let signature =
         ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
 
     let res = SignedDkimPublicKey {
         selector,
-        domain: domain.clone(),
+        domain: signed_domain.clone(),
         signature,
         public_key,
         public_key_hash: public_key_hash_hex,
@@ -155,9 +163,16 @@ pub async fn revoke_dkim_public_key(
     selector: String,
     domain: String,
     private_key_der: String,
-) -> Result<SignedRevocation, String>  {
+) -> Result<SignedRevocation, String> {
     let mut error0 = String::new();
-    match _revoke_dkim_public_key(selector.clone(), domain.clone(), private_key_der.clone()).await {
+    match _revoke_dkim_public_key(
+        selector.clone(),
+        domain.clone(),
+        domain.clone(),
+        private_key_der.clone(),
+    )
+    .await
+    {
         Ok(res) => {
             return Ok(res);
         }
@@ -165,9 +180,10 @@ pub async fn revoke_dkim_public_key(
             error0 = e;
         }
     }
-    let domain_with_gappssmtp = format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);
+    let domain_with_gappssmtp =
+        format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);
     let mut error1 = String::new();
-    match _revoke_dkim_public_key(selector, domain_with_gappssmtp, private_key_der).await {
+    match _revoke_dkim_public_key(selector, domain_with_gappssmtp, domain, private_key_der).await {
         Ok(res) => {
             return Ok(res);
         }
@@ -175,12 +191,16 @@ pub async fn revoke_dkim_public_key(
             error1 = e;
         }
     }
-    Err(format!("any revocation failed. error0: {}, error1: {}", error0, error1))
+    Err(format!(
+        "any revocation failed. error0: {}, error1: {}",
+        error0, error1
+    ))
 }
 
 async fn _revoke_dkim_public_key(
     selector: String,
     domain: String,
+    signed_domain: String,
     private_key_der: String,
 ) -> Result<SignedRevocation, String> {
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
@@ -196,11 +216,11 @@ async fn _revoke_dkim_public_key(
         "0x".to_string() + &hex::encode(&public_key.n().to_bytes_be())
     };
     let dns_client_canister_id =
-    Principal::from_text(canister_state.dns_client_canister_id.clone()).unwrap();
+        Principal::from_text(canister_state.dns_client_canister_id.clone()).unwrap();
     let (fetched_public_key,): (Result<String, String>,) = ic_cdk::api::call::call(
         dns_client_canister_id,
         "get_dkim_public_key",
-        (&selector, &domain, 40_000_000_000u64, ),
+        (&selector, &domain, 40_000_000_000u64),
     )
     .await
     .map_err(|(code, e)| format!("dns_client canister error. {:?}, {}", code, e))?;
@@ -219,14 +239,14 @@ async fn _revoke_dkim_public_key(
     let public_key_hash_hex = res?;
     let message = format!(
         "REVOKE:selector={};domain={};public_key_hash={};",
-        selector, domain, public_key_hash_hex
+        selector, signed_domain, public_key_hash_hex
     );
     let signature =
         ic_evm_sign::sign_msg(message.as_bytes().to_vec(), Principal::anonymous()).await?;
 
     let res = SignedRevocation {
         selector,
-        domain: domain.clone(),
+        domain: signed_domain.clone(),
         // chain_id: canister_state.chain_id,
         signature,
         public_key: fetched_public_key,
