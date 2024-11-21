@@ -289,7 +289,7 @@ pub async fn sign_dkim_public_key(
     let domain_with_gappssmtp =
         format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);
     let mut error0 = String::new();
-    match _sign_dkim_public_key(selector.clone(), domain).await {
+    match _sign_dkim_public_key(selector.clone(), domain.clone(), domain.clone()).await {
         Ok(res) => {
             write_log(
                 "sign_dkim_public_key",
@@ -302,7 +302,7 @@ pub async fn sign_dkim_public_key(
         }
     }
     let mut error1 = String::new();
-    match _sign_dkim_public_key(selector, domain_with_gappssmtp).await {
+    match _sign_dkim_public_key(selector, domain_with_gappssmtp, domain.clone()).await {
         Ok(res) => {
             write_log(
                 "sign_dkim_public_key",
@@ -347,6 +347,7 @@ fn _init(
 async fn _sign_dkim_public_key(
     selector: String,
     domain: String,
+    signed_domain: String,
 ) -> Result<SignedDkimPublicKey, String> {
     write_log(
         "_sign_dkim_public_key",
@@ -424,7 +425,7 @@ async fn _sign_dkim_public_key(
     let public_key_hash_hex = res?;
     let message = format!(
         "SET:domain={};public_key_hash={};",
-        domain, public_key_hash_hex
+        signed_domain, public_key_hash_hex
     );
     write_log(
         "_sign_dkim_public_key",
@@ -441,7 +442,7 @@ async fn _sign_dkim_public_key(
     );
     let res = SignedDkimPublicKey {
         selector,
-        domain: domain.clone(),
+        domain: signed_domain.clone(),
         signature,
         public_key,
         public_key_hash: public_key_hash_hex,
@@ -487,6 +488,7 @@ pub async fn revoke_dkim_public_key(
     match _revoke_dkim_public_key(
         selector.clone(),
         domain.clone(),
+        domain.clone(),
         private_key_der_hex.clone(),
     )
     .await
@@ -505,7 +507,14 @@ pub async fn revoke_dkim_public_key(
     let domain_with_gappssmtp =
         format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);
     let mut error1 = String::new();
-    match _revoke_dkim_public_key(selector, domain_with_gappssmtp, private_key_der_hex).await {
+    match _revoke_dkim_public_key(
+        selector,
+        domain_with_gappssmtp,
+        domain.clone(),
+        private_key_der_hex,
+    )
+    .await
+    {
         Ok(res) => {
             write_log(
                 "revoke_dkim_public_key",
@@ -536,6 +545,7 @@ pub async fn revoke_dkim_public_key(
 async fn _revoke_dkim_public_key(
     selector: String,
     domain: String,
+    signed_domain: String,
     private_key_der_hex: String,
 ) -> Result<SignedRevocation, String> {
     write_log(
@@ -626,7 +636,7 @@ async fn _revoke_dkim_public_key(
     let public_key_hash_hex = res?;
     let message = format!(
         "REVOKE:domain={};public_key_hash={};",
-        domain, public_key_hash_hex
+        signed_domain, public_key_hash_hex
     );
     write_log(
         "_revoke_dkim_public_key",
@@ -643,7 +653,7 @@ async fn _revoke_dkim_public_key(
     );
     let res = SignedRevocation {
         selector,
-        domain: domain.clone(),
+        domain: signed_domain.clone(),
         signature,
         public_key: fetched_public_key,
         public_key_hash: public_key_hash_hex,
@@ -975,6 +985,27 @@ mod test {
         let canister_http_request = &canister_http_requests[0];
         println!("{:?}", canister_http_request);
         let body = r#"
+            {"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16}],"Answer":[],"Comment":"Response from 216.239.38.99."}
+            "#;
+        let mock_canister_http_response = MockCanisterHttpResponse {
+            subnet_id: canister_http_request.subnet_id,
+            request_id: canister_http_request.request_id,
+            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                status: 200,
+                headers: vec![],
+                body: body.as_bytes().to_vec(),
+            }),
+            additional_responses: vec![],
+        };
+        pic.mock_canister_http_response(mock_canister_http_response);
+        pic.tick();
+        pic.tick();
+        pic.tick();
+        let canister_http_requests = pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 1);
+        let canister_http_request = &canister_http_requests[0];
+        println!("{:?}", canister_http_request);
+        let body = r#"
             {"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16}],"Answer":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16,"TTL":3600,"data":"v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3gWcOhCm99qzN+h7/2+LeP3CLsJkQQ4EP/2mrceXle5pKq8uZmBl1U4d2Vxn4w+pWFANDLmcHolLboESLFqEL5N6ae7u9b236dW4zn9AFkXAGenTzQEeif9VUFtLAZ0Qh2eV7OQgz/vPj5IaNqJ7h9hpM9gO031fe4v+J0DLCE8Rgo7hXbNgJavctc0983DaCDQaznHZ44LZ6TtZv9TBs+QFvsy4+UCTfsuOtHzoEqOOuXsVXZKLP6B882XbEnBpXEF8QzV4J26HiAJFUbO3mAqZL2UeKC0hhzoIZqZXNG0BfuzOF0VLpDa18GYMUiu+LhEJPJO9D8zhzvQIHNrpGwIDAQAB"}],"Comment":"Response from 216.239.38.99."}
             "#;
         let mock_canister_http_response = MockCanisterHttpResponse {
@@ -988,6 +1019,9 @@ mod test {
             additional_responses: vec![],
         };
         pic.mock_canister_http_response(mock_canister_http_response);
+        pic.tick();
+        pic.tick();
+        pic.tick();
 
         // // Now the test canister will receive the http outcall response
         // // and reply to the ingress message from the test driver.
@@ -1407,7 +1441,7 @@ mod test {
         // println!("status: {:?}", pic.canister_status(canister_id, None));
 
         assert_eq!(res.selector, "20230601");
-        assert_eq!(res.domain, "gmail-com.20230601.gappssmtp.com");
+        assert_eq!(res.domain, "gmail.com");
         assert_eq!(res.public_key, public_key_hex);
         // // There should be no more pending canister http outcalls.
         let canister_http_requests = pic.get_canister_http();
