@@ -1,7 +1,5 @@
-use std::fmt::format;
-
 use base64::{engine::general_purpose, Engine as _};
-use candid::{Nat, Principal};
+use candid::Nat;
 use ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse, TransformArgs,
     TransformContext,
@@ -247,19 +245,10 @@ ic_cdk::export_candid!();
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use candid::{decode_one, encode_args, encode_one, Encode, Principal};
-    use ic_cdk::api::call::RejectionCode;
-    use ic_cdk::api::management_canister::http_request::{
-        http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse,
-        TransformArgs, TransformContext,
-    };
+    use candid::{decode_one, Encode, Principal};
     use pocket_ic::{
-        common::rest::{
-            BlobCompression, CanisterHttpHeader, CanisterHttpReply, CanisterHttpResponse,
-            MockCanisterHttpResponse, RawEffectivePrincipal, SubnetKind,
-        },
-        update_candid, PocketIc, PocketIcBuilder, WasmResult,
+        common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse},
+        PocketIcBuilder, WasmResult,
     };
 
     #[test]
@@ -279,7 +268,6 @@ mod test {
         let wasm_bytes =
             include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
         pic.install_canister(canister_id, wasm_bytes, vec![], None);
-        // let sender = pic.create_canister();
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
         let call_id = pic
@@ -338,7 +326,6 @@ mod test {
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         match reply {
             WasmResult::Reply(data) => {
                 let http_response: Result<String, String> = decode_one(&data).unwrap();
@@ -386,7 +373,6 @@ mod test {
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 1);
         let canister_http_request = &canister_http_requests[0];
-        println!("{:?}", canister_http_request);
         let body = r#"
             {
                 "Status": 0,
@@ -419,7 +405,6 @@ mod test {
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         match reply {
             WasmResult::Reply(data) => {
                 let http_response: Result<String, String> = decode_one(&data).unwrap();
@@ -467,7 +452,6 @@ mod test {
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 1);
         let canister_http_request = &canister_http_requests[0];
-        println!("{:?}", canister_http_request);
         let body = r#"
             {
                 "Status": 0,
@@ -508,7 +492,6 @@ mod test {
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         match reply {
             WasmResult::Reply(data) => {
                 let http_response: Result<String, String> = decode_one(&data).unwrap();
@@ -556,7 +539,6 @@ mod test {
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 1);
         let canister_http_request = &canister_http_requests[0];
-        println!("{:?}", canister_http_request);
         let body = r#"
             {
                 "Status": 0,
@@ -597,7 +579,6 @@ mod test {
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         match reply {
             WasmResult::Reply(data) => {
                 let http_response: Result<String, String> = decode_one(&data).unwrap();
@@ -645,7 +626,6 @@ mod test {
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         match reply {
             WasmResult::Reply(data) => {
                 let http_response: Result<String, String> = decode_one(&data).unwrap();
@@ -693,7 +673,6 @@ mod test {
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         match reply {
             WasmResult::Reply(data) => {
                 let http_response: Result<String, String> = decode_one(&data).unwrap();

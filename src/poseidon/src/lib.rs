@@ -91,7 +91,7 @@ fn _bytes_chunk_fields(bytes: &[u8], chunk_size: usize, num_chunk_in_field: usiz
             let mut input = Fr::zero();
             let mut coeff = Fr::one();
             let offset = Fr::from_u128(1u128 << chunk_size);
-            for (i, word) in words.iter().enumerate() {
+            for word in words.iter() {
                 input += coeff * word;
                 coeff *= offset;
             }
@@ -118,15 +118,8 @@ ic_cdk::export_candid!();
 #[cfg(test)]
 mod test {
     use super::*;
-    use candid::{decode_one, encode_args, encode_one, Encode, Principal};
-    use ic_cdk::api::call::RejectionCode;
-    use pocket_ic::{
-        common::rest::{
-            BlobCompression, CanisterHttpHeader, CanisterHttpReply, CanisterHttpResponse,
-            MockCanisterHttpResponse, RawEffectivePrincipal, SubnetKind,
-        },
-        update_candid, PocketIc, PocketIcBuilder, WasmResult,
-    };
+    use candid::{decode_one, encode_one, Principal};
+    use pocket_ic::{PocketIc, WasmResult};
 
     const PUBLIC_KEY: &'static str = "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f";
     const PUBLIC_KEY_HASH: &'static str =
@@ -149,8 +142,6 @@ mod test {
         let wasm_bytes =
             include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec();
         pic.install_canister(canister_id, wasm_bytes, vec![], None);
-        // let sender = pic.create_canister();
-        // pic.add_cycles(sender, CHARGED_CYCLE);
         let reply = pic
             .update_call(
                 canister_id,
@@ -159,7 +150,6 @@ mod test {
                 encode_one(PUBLIC_KEY.to_string()).unwrap(),
             )
             .unwrap();
-        println!("{:?}", reply);
         match reply {
             WasmResult::Reply(data) => {
                 let res: Result<String, String> = decode_one(&data).unwrap();
@@ -171,34 +161,4 @@ mod test {
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
     }
-
-    // #[test]
-    // fn test_poseidon_canister_insufficient_cycle() {
-    //     let pic = PocketIc::new();
-    //     // Create an empty canister as the anonymous principal and add cycles.
-    //     let canister_id = pic.create_canister();
-    //     pic.add_cycles(canister_id, 2_000_000_000_000);
-    //     let wasm_bytes =
-    //         include_bytes!("../../../target/wasm32-unknown-unknown/release/poseidon.wasm").to_vec();
-    //     pic.install_canister(canister_id, wasm_bytes, vec![], None);
-    //     let sender = pic.create_canister();
-    //     pic.add_cycles(sender, CHARGED_CYCLE - 1);
-    //     let reply = pic
-    //         .update_call(
-    //             canister_id,
-    //             sender,
-    //             "public_key_hash",
-    //             encode_one(PUBLIC_KEY.to_string()).unwrap(),
-    //         )
-    //         .unwrap();
-    //     println!("{:?}", reply);
-    //     match reply {
-    //         WasmResult::Reply(data) => {
-    //             let res: Result<String, String> = decode_one(&data).unwrap();
-    //             assert!(res.is_err());
-    //             // assert_eq!(res.unwrap(), PUBLIC_KEY_HASH);
-    //         }
-    //         WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
-    //     };
-    // }
 }

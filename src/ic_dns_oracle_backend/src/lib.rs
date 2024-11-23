@@ -1,24 +1,13 @@
 #![allow(non_snake_case, non_upper_case_globals)]
 use candid::{CandidType, Principal};
 use hex;
-use ic_cdk::{
-    api::management_canister::http_request::{
-        http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse,
-        TransformArgs, TransformContext,
-    },
-    caller,
-};
 use ic_evm_sign;
 use ic_evm_sign::state::Environment;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap, StableLog};
-use rsa::{
-    pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey},
-    traits::{PrivateKeyParts, PublicKeyParts},
-    BigUint, RsaPrivateKey, RsaPublicKey,
-};
-use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, cell::RefCell, collections::HashMap};
+use rsa::{pkcs1::DecodeRsaPrivateKey, traits::PublicKeyParts, BigUint, RsaPrivateKey};
+use serde::Deserialize;
+use std::cell::RefCell;
 
 // consumed cycle for sign_dkim_public_key: 26_164_599_060 cycles
 // the consumed cycle * 1.5 is charged cycle = 39_246_898_590 cycles
@@ -288,8 +277,8 @@ pub async fn sign_dkim_public_key(
     );
     let domain_with_gappssmtp =
         format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);
-    let mut error0 = String::new();
-    match _sign_dkim_public_key(selector.clone(), domain.clone(), domain.clone()).await {
+    let error0 = match _sign_dkim_public_key(selector.clone(), domain.clone(), domain.clone()).await
+    {
         Ok(res) => {
             write_log(
                 "sign_dkim_public_key",
@@ -297,12 +286,10 @@ pub async fn sign_dkim_public_key(
             );
             return Ok(res);
         }
-        Err(e) => {
-            error0 = e;
-        }
-    }
-    let mut error1 = String::new();
-    match _sign_dkim_public_key(selector, domain_with_gappssmtp, domain.clone()).await {
+        Err(e) => e,
+    };
+    let error1 = match _sign_dkim_public_key(selector, domain_with_gappssmtp, domain.clone()).await
+    {
         Ok(res) => {
             write_log(
                 "sign_dkim_public_key",
@@ -313,10 +300,8 @@ pub async fn sign_dkim_public_key(
             );
             return Ok(res);
         }
-        Err(e) => {
-            error1 = e;
-        }
-    }
+        Err(e) => e,
+    };
     write_log(
         "sign_dkim_public_key",
         &format!(
@@ -484,8 +469,7 @@ pub async fn revoke_dkim_public_key(
             selector, domain, private_key_der_hex
         ),
     );
-    let mut error0 = String::new();
-    match _revoke_dkim_public_key(
+    let error0 = match _revoke_dkim_public_key(
         selector.clone(),
         domain.clone(),
         domain.clone(),
@@ -500,14 +484,11 @@ pub async fn revoke_dkim_public_key(
             );
             return Ok(res);
         }
-        Err(e) => {
-            error0 = e;
-        }
-    }
+        Err(e) => e,
+    };
     let domain_with_gappssmtp =
         format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);
-    let mut error1 = String::new();
-    match _revoke_dkim_public_key(
+    let error1 = match _revoke_dkim_public_key(
         selector,
         domain_with_gappssmtp,
         domain.clone(),
@@ -525,10 +506,8 @@ pub async fn revoke_dkim_public_key(
             );
             return Ok(res);
         }
-        Err(e) => {
-            error1 = e;
-        }
-    }
+        Err(e) => e,
+    };
     write_log(
         "revoke_dkim_public_key",
         &format!(
@@ -558,8 +537,6 @@ async fn _revoke_dkim_public_key(
     if CONFIG.with(|config| config.borrow().get(&0).is_none()) {
         return Err("ethereum address not found".to_string());
     }
-    // let private_key_der = hex::decode(&private_key_der_hex[2..])
-    //     .map_err(|e| format!("invalid private key hex. {}", e))?;
     // Generate the public key from the private key.
     let revoked_public_key = {
         let private_key = RsaPrivateKey::from_pkcs1_der(
@@ -684,27 +661,17 @@ ic_cdk::export_candid!();
 mod test {
     use super::*;
     use base64::{engine::general_purpose, Engine as _};
-    use candid::{decode_one, encode_args, encode_one, Encode, Principal};
+    use candid::{decode_one, encode_one, Encode, Principal};
     use easy_hasher::easy_hasher::raw_keccak256;
-    use ethers_core::types::*;
     use hex;
-    use ic_cdk::api::management_canister::http_request::{
-        http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse,
-        TransformArgs, TransformContext,
-    };
     use libsecp256k1;
     use pocket_ic::{
-        common::rest::{
-            BlobCompression, CanisterHttpHeader, CanisterHttpReply, CanisterHttpResponse,
-            MockCanisterHttpResponse, RawEffectivePrincipal, SubnetKind,
-        },
-        update_candid, PocketIc, PocketIcBuilder, WasmResult,
+        common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse},
+        PocketIcBuilder, WasmResult,
     };
-    use poseidon::public_key_hash;
+    use rsa::pkcs1::EncodeRsaPrivateKey;
     use rsa::pkcs1::EncodeRsaPublicKey;
-    use rsa::pkcs1::{der::SecretDocument, EncodeRsaPrivateKey};
     use rsa::rand_core::OsRng;
-    use std::str::FromStr;
 
     const PUBLIC_KEY: &'static str = "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f";
     const PUBLIC_KEY_HASH: &'static str =
@@ -738,14 +705,11 @@ mod test {
 
         // Create empty canisters as the anonymous principal and add cycles.
         let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("poseidon_canister_id {:?}", poseidon_canister_id);
         pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
         let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("dns_client_canister_id {:?}", dns_client_canister_id);
         pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
         // We create a canister on the app subnet.
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("canister_id {:?}", canister_id);
         assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
@@ -784,13 +748,12 @@ mod test {
                 encode_one(()).unwrap(),
             )
             .unwrap();
-        // pic.tick();
+
         let reply = pic.await_call(call_id).unwrap();
         let signer_addr = match reply {
             WasmResult::Reply(data) => {
                 let res: String = decode_one(&data).unwrap();
                 res
-                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
@@ -812,7 +775,6 @@ mod test {
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 1);
         let canister_http_request = &canister_http_requests[0];
-        println!("{:?}", canister_http_request);
         let body = r#"
             {
                 "Status": 0,
@@ -853,12 +815,10 @@ mod test {
         // // Now the test canister will receive the http outcall response
         // // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         let res = match reply {
             WasmResult::Reply(data) => {
                 let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
                 res.unwrap()
-                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
@@ -869,7 +829,7 @@ mod test {
         // // There should be no more pending canister http outcalls.
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 0);
-        println!("{:?}", res);
+
         let signature = hex::decode(&res.signature[2..]).unwrap();
         let signature_bytes: [u8; 64] = signature[0..64].try_into().unwrap();
         let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
@@ -890,7 +850,6 @@ mod test {
         let recovered_addr =
             ic_evm_sign::get_address_from_public_key(public_key.serialize_compressed().to_vec())
                 .unwrap();
-        println!("recovered_addr {:?}", recovered_addr);
         assert_eq!(recovered_addr.to_string(), signer_addr);
     }
 
@@ -909,14 +868,11 @@ mod test {
 
         // Create empty canisters as the anonymous principal and add cycles.
         let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("poseidon_canister_id {:?}", poseidon_canister_id);
         pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
         let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("dns_client_canister_id {:?}", dns_client_canister_id);
         pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
         // We create a canister on the app subnet.
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("canister_id {:?}", canister_id);
         assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
@@ -955,13 +911,11 @@ mod test {
                 encode_one(()).unwrap(),
             )
             .unwrap();
-        // pic.tick();
         let reply = pic.await_call(call_id).unwrap();
         let signer_addr = match reply {
             WasmResult::Reply(data) => {
                 let res: String = decode_one(&data).unwrap();
                 res
-                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
@@ -983,7 +937,6 @@ mod test {
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 1);
         let canister_http_request = &canister_http_requests[0];
-        println!("{:?}", canister_http_request);
         let body = r#"
             {"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16}],"Answer":[],"Comment":"Response from 216.239.38.99."}
             "#;
@@ -1004,7 +957,6 @@ mod test {
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 1);
         let canister_http_request = &canister_http_requests[0];
-        println!("{:?}", canister_http_request);
         let body = r#"
             {"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16}],"Answer":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16,"TTL":3600,"data":"v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3gWcOhCm99qzN+h7/2+LeP3CLsJkQQ4EP/2mrceXle5pKq8uZmBl1U4d2Vxn4w+pWFANDLmcHolLboESLFqEL5N6ae7u9b236dW4zn9AFkXAGenTzQEeif9VUFtLAZ0Qh2eV7OQgz/vPj5IaNqJ7h9hpM9gO031fe4v+J0DLCE8Rgo7hXbNgJavctc0983DaCDQaznHZ44LZ6TtZv9TBs+QFvsy4+UCTfsuOtHzoEqOOuXsVXZKLP6B882XbEnBpXEF8QzV4J26HiAJFUbO3mAqZL2UeKC0hhzoIZqZXNG0BfuzOF0VLpDa18GYMUiu+LhEJPJO9D8zhzvQIHNrpGwIDAQAB"}],"Comment":"Response from 216.239.38.99."}
             "#;
@@ -1026,12 +978,10 @@ mod test {
         // // Now the test canister will receive the http outcall response
         // // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         let res = match reply {
             WasmResult::Reply(data) => {
                 let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
                 res.unwrap()
-                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
@@ -1042,10 +992,9 @@ mod test {
             res.public_key_hash,
             "0x1f41be830e3f38f638195af065c7de98c05aa979b448a464ef4d13c01f7d0d3c"
         );
-        // // There should be no more pending canister http outcalls.
+        // There should be no more pending canister http outcalls.
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 0);
-        println!("{:?}", res);
         let signature = hex::decode(&res.signature[2..]).unwrap();
         let signature_bytes: [u8; 64] = signature[0..64].try_into().unwrap();
         let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
@@ -1066,7 +1015,6 @@ mod test {
         let recovered_addr =
             ic_evm_sign::get_address_from_public_key(public_key.serialize_compressed().to_vec())
                 .unwrap();
-        println!("recovered_addr {:?}", recovered_addr);
         assert_eq!(recovered_addr.to_string(), signer_addr);
     }
 
@@ -1085,14 +1033,11 @@ mod test {
 
         // Create empty canisters as the anonymous principal and add cycles.
         let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("poseidon_canister_id {:?}", poseidon_canister_id);
         pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
         let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("dns_client_canister_id {:?}", dns_client_canister_id);
         pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
         // We create a canister on the app subnet.
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("canister_id {:?}", canister_id);
         assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
@@ -1131,28 +1076,22 @@ mod test {
                 encode_one(()).unwrap(),
             )
             .unwrap();
-        // pic.tick();
         let reply = pic.await_call(call_id).unwrap();
         let signer_addr = match reply {
             WasmResult::Reply(data) => {
                 let res: String = decode_one(&data).unwrap();
                 res
-                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
 
         let private_key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
-        // println!("public key {:?}", private_key.to_public_key());
         let private_key_der = private_key.to_pkcs1_der().unwrap();
-        // println!("private_key_der {:?}", private_key_der.as_bytes());
         let private_key_der_hex = "0x".to_string() + &hex::encode(&private_key_der.as_bytes());
         let public_key_hex = private_key_der_to_public_key_hex(&private_key_der.as_bytes());
         let public_key_der = private_key.to_public_key().to_pkcs1_der().unwrap();
-        println!("public_key_der {:?}", public_key_der);
-        println!("public_key_der bytes {:?}", public_key_der.as_bytes());
         let public_key_der_base64 = general_purpose::STANDARD.encode(&public_key_der.as_bytes());
-        println!("public_key_der_base64 {}", public_key_der_base64);
+
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
         let call_id = pic
@@ -1170,7 +1109,6 @@ mod test {
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 1);
         let canister_http_request = &canister_http_requests[0];
-        println!("{:?}", canister_http_request);
         let mut body = r#"
         {
             "Status": 0,
@@ -1210,25 +1148,22 @@ mod test {
         };
         pic.mock_canister_http_response(mock_canister_http_response);
 
-        // // Now the test canister will receive the http outcall response
-        // // and reply to the ingress message from the test driver.
+        // Now the test canister will receive the http outcall response
+        // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         let res = match reply {
             WasmResult::Reply(data) => {
                 let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
                 res.unwrap()
-                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
         assert_eq!(res.selector, "20230601");
         assert_eq!(res.domain, "gmail.com");
         assert_eq!(res.public_key, public_key_hex);
-        // // There should be no more pending canister http outcalls.
+        // There should be no more pending canister http outcalls.
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 0);
-        println!("{:?}", res);
         let signature = hex::decode(&res.signature[2..]).unwrap();
         let signature_bytes: [u8; 64] = signature[0..64].try_into().unwrap();
         let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
@@ -1249,7 +1184,6 @@ mod test {
         let recovered_addr =
             ic_evm_sign::get_address_from_public_key(public_key.serialize_compressed().to_vec())
                 .unwrap();
-        println!("recovered_addr {:?}", recovered_addr);
         assert_eq!(recovered_addr.to_string(), signer_addr);
     }
 
@@ -1268,14 +1202,11 @@ mod test {
 
         // Create empty canisters as the anonymous principal and add cycles.
         let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        // println!("poseidon_canister_id {:?}", poseidon_canister_id);
         pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
         let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        // println!("dns_client_canister_id {:?}", dns_client_canister_id);
         pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
         // We create a canister on the app subnet.
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        // println!("canister_id {:?}", canister_id);
         assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
@@ -1314,28 +1245,22 @@ mod test {
                 encode_one(()).unwrap(),
             )
             .unwrap();
-        // pic.tick();
         let reply = pic.await_call(call_id).unwrap();
         let signer_addr = match reply {
             WasmResult::Reply(data) => {
                 let res: String = decode_one(&data).unwrap();
                 res
-                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
 
         let private_key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
-        // println!("public key {:?}", private_key.to_public_key());
         let private_key_der = private_key.to_pkcs1_der().unwrap();
-        // println!("private_key_der {:?}", private_key_der.as_bytes());
         let private_key_der_hex = "0x".to_string() + &hex::encode(&private_key_der.as_bytes());
         let public_key_hex = private_key_der_to_public_key_hex(&private_key_der.as_bytes());
         let public_key_der = private_key.to_public_key().to_pkcs1_der().unwrap();
         let public_key_der_base64 = general_purpose::STANDARD.encode(&public_key_der.as_bytes());
-        // Submit an update call to the test canister making a canister http outcall
-        // and mock a canister http outcall response.
-        // println!("status: {:?}", pic.canister_status(canister_id, None));
+
         let call_id = pic
             .submit_call(
                 canister_id,
@@ -1426,24 +1351,20 @@ mod test {
         };
         pic.mock_canister_http_response(mock_canister_http_response);
 
-        // // Now the test canister will receive the http outcall response
-        // // and reply to the ingress message from the test driver.
         let reply = pic.await_call(call_id).unwrap();
         println!("{:?}", reply);
         let res = match reply {
             WasmResult::Reply(data) => {
                 let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
                 res.unwrap()
-                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
-        // println!("status: {:?}", pic.canister_status(canister_id, None));
 
         assert_eq!(res.selector, "20230601");
         assert_eq!(res.domain, "gmail.com");
         assert_eq!(res.public_key, public_key_hex);
-        // // There should be no more pending canister http outcalls.
+        // There should be no more pending canister http outcalls.
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 0);
         println!("{:?}", res);
@@ -1467,7 +1388,6 @@ mod test {
         let recovered_addr =
             ic_evm_sign::get_address_from_public_key(public_key.serialize_compressed().to_vec())
                 .unwrap();
-        println!("recovered_addr {:?}", recovered_addr);
         assert_eq!(recovered_addr.to_string(), signer_addr);
     }
 
@@ -1486,14 +1406,11 @@ mod test {
 
         // Create empty canisters as the anonymous principal and add cycles.
         let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("poseidon_canister_id {:?}", poseidon_canister_id);
         pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
         let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("dns_client_canister_id {:?}", dns_client_canister_id);
         pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
         // We create a canister on the app subnet.
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("canister_id {:?}", canister_id);
         assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
@@ -1532,16 +1449,12 @@ mod test {
                 encode_one(()).unwrap(),
             )
             .unwrap();
-        // pic.tick();
-        let reply = pic.await_call(call_id).unwrap();
+        let _ = pic.await_call(call_id).unwrap();
 
         let private_key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
-        // println!("public key {:?}", private_key.to_public_key());
         let private_key_der = private_key.to_pkcs1_der().unwrap();
-        // println!("private_key_der {:?}", private_key_der.as_bytes());
         let private_key_der_hex = "0x".to_string() + &hex::encode(&private_key_der.as_bytes());
-        // Submit an update call to the test canister making a canister http outcall
-        // and mock a canister http outcall response.
+
         let call_id = pic
             .submit_call(
                 canister_id,
@@ -1557,7 +1470,6 @@ mod test {
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 1);
         let canister_http_request = &canister_http_requests[0];
-        println!("{:?}", canister_http_request);
         let body = r#"
         {
             "Status": 0,
@@ -1616,7 +1528,6 @@ mod test {
         pic.mock_canister_http_response(mock_canister_http_response);
 
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         match reply {
             WasmResult::Reply(data) => {
                 let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
@@ -1641,14 +1552,11 @@ mod test {
 
         // Create empty canisters as the anonymous principal and add cycles.
         let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("poseidon_canister_id {:?}", poseidon_canister_id);
         pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
         let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("dns_client_canister_id {:?}", dns_client_canister_id);
         pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
         // We create a canister on the app subnet.
         let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        println!("canister_id {:?}", canister_id);
         assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
         pic.add_cycles(canister_id, 2_000_000_000_000);
         pic.install_canister(
@@ -1687,8 +1595,7 @@ mod test {
                 encode_one(()).unwrap(),
             )
             .unwrap();
-        // pic.tick();
-        let reply = pic.await_call(call_id).unwrap();
+        let _ = pic.await_call(call_id).unwrap();
 
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
@@ -1711,7 +1618,6 @@ mod test {
             WasmResult::Reply(data) => {
                 let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
                 assert!(res.is_err());
-                // assert_eq!(http_response.unwrap(), "0x9edbd2293d6192a84a7b4c5c699d31f906e8b83b09b817dbcbf4bcda3c6ca02fd2a1d99f995b360f52801f79a2d40a9d31d535da1d957c44de389920198ab996377df7a009eee7764b238b42696168d1c7ecbc7e31d69bf3fcc337549dc4f0110e070cec0b111021f0435e51db415a2940011aee0d4db4767c32a76308aae634320642d63fe2e018e81f505e13e0765bd8f6366d0b443fa41ea8eb5c5b8aebb07db82fb5e10fe1d265bd61b22b6b13454f6e1273c43c08e0917cd795cc9d25636606145cff02c48d58d0538d96ab50620b28ad9f5aa685b528f41ef1bad24a546c8bdb1707fb6ee7a2e61bbb440cd9ab6795d4c106145000c13aeeedd678b05f");
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
