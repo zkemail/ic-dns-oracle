@@ -667,7 +667,7 @@ mod test {
     use libsecp256k1;
     use pocket_ic::{
         common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse},
-        PocketIcBuilder, WasmResult,
+        PocketIc, PocketIcBuilder, WasmResult,
     };
     use rsa::pkcs1::EncodeRsaPrivateKey;
     use rsa::pkcs1::EncodeRsaPublicKey;
@@ -692,52 +692,7 @@ mod test {
 
     #[test]
     fn test_sign_gmail() {
-        // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        // We retrieve the app subnet ID from the topology.
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create empty canisters as the anonymous principal and add cycles.
-        let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
-        let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
-        // We create a canister on the app subnet.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        pic.install_canister(
-            poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            canister_id,
-            include_bytes!(
-                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
-            )
-            .to_vec(),
-            Encode!(
-                &Some(Environment::Production),
-                &poseidon_canister_id.to_string(),
-                &dns_client_canister_id.to_string()
-            )
-            .unwrap(),
-            None,
-        );
+        let (pic, canister_id) = test_setup();
 
         // Init the signer's ethereum address.
         let call_id = pic
@@ -769,12 +724,6 @@ mod test {
             )
             .unwrap();
 
-        pic.tick();
-        pic.tick();
-
-        let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
         let body = r#"
             {
                 "Status": 0,
@@ -800,17 +749,9 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, body);
+        pic.tick();
+        mock_http_response(&pic, body);
 
         // // Now the test canister will receive the http outcall response
         // // and reply to the ingress message from the test driver.
@@ -855,52 +796,7 @@ mod test {
 
     #[test]
     fn test_sign_gappssmtp() {
-        // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        // We retrieve the app subnet ID from the topology.
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create empty canisters as the anonymous principal and add cycles.
-        let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
-        let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
-        // We create a canister on the app subnet.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        pic.install_canister(
-            poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            canister_id,
-            include_bytes!(
-                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
-            )
-            .to_vec(),
-            Encode!(
-                &Some(Environment::Production),
-                &poseidon_canister_id.to_string(),
-                &dns_client_canister_id.to_string()
-            )
-            .unwrap(),
-            None,
-        );
+        let (pic, canister_id) = test_setup();
 
         // Init the signer's ethereum address.
         let call_id = pic
@@ -931,49 +827,22 @@ mod test {
             )
             .unwrap();
 
-        pic.tick();
-        pic.tick();
-
-        let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
         let body = r#"
             {"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16}],"Answer":[],"Comment":"Response from 216.239.38.99."}
             "#;
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, body);
         pic.tick();
+        mock_http_response(&pic, body);
         pic.tick();
+        mock_http_response(&pic, body);
         pic.tick();
-        let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
+
         let body = r#"
             {"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16}],"Answer":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16,"TTL":3600,"data":"v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3gWcOhCm99qzN+h7/2+LeP3CLsJkQQ4EP/2mrceXle5pKq8uZmBl1U4d2Vxn4w+pWFANDLmcHolLboESLFqEL5N6ae7u9b236dW4zn9AFkXAGenTzQEeif9VUFtLAZ0Qh2eV7OQgz/vPj5IaNqJ7h9hpM9gO031fe4v+J0DLCE8Rgo7hXbNgJavctc0983DaCDQaznHZ44LZ6TtZv9TBs+QFvsy4+UCTfsuOtHzoEqOOuXsVXZKLP6B882XbEnBpXEF8QzV4J26HiAJFUbO3mAqZL2UeKC0hhzoIZqZXNG0BfuzOF0VLpDa18GYMUiu+LhEJPJO9D8zhzvQIHNrpGwIDAQAB"}],"Comment":"Response from 216.239.38.99."}
             "#;
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, body);
         pic.tick();
-        pic.tick();
-        pic.tick();
+        mock_http_response(&pic, body);
 
         // // Now the test canister will receive the http outcall response
         // // and reply to the ingress message from the test driver.
@@ -1020,52 +889,7 @@ mod test {
 
     #[test]
     fn test_revoke_valid_case() {
-        // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        // We retrieve the app subnet ID from the topology.
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create empty canisters as the anonymous principal and add cycles.
-        let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
-        let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
-        // We create a canister on the app subnet.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        pic.install_canister(
-            poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            canister_id,
-            include_bytes!(
-                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
-            )
-            .to_vec(),
-            Encode!(
-                &Some(Environment::Production),
-                &poseidon_canister_id.to_string(),
-                &dns_client_canister_id.to_string()
-            )
-            .unwrap(),
-            None,
-        );
+        let (pic, canister_id) = test_setup();
 
         // Init the signer's ethereum address.
         let call_id = pic
@@ -1103,12 +927,6 @@ mod test {
             )
             .unwrap();
 
-        pic.tick();
-        pic.tick();
-
-        let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
         let mut body = r#"
         {
             "Status": 0,
@@ -1136,17 +954,9 @@ mod test {
         "#
         .to_string();
         body = body.replace("{{BASE64}}", &public_key_der_base64);
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, &body);
+        pic.tick();
+        mock_http_response(&pic, &body);
 
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
@@ -1189,52 +999,7 @@ mod test {
 
     #[test]
     fn test_revoke_valid_case_gappssmtp() {
-        // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        // We retrieve the app subnet ID from the topology.
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create empty canisters as the anonymous principal and add cycles.
-        let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
-        let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
-        // We create a canister on the app subnet.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        pic.install_canister(
-            poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            canister_id,
-            include_bytes!(
-                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
-            )
-            .to_vec(),
-            Encode!(
-                &Some(Environment::Production),
-                &poseidon_canister_id.to_string(),
-                &dns_client_canister_id.to_string()
-            )
-            .unwrap(),
-            None,
-        );
+        let (pic, canister_id) = test_setup();
 
         // Init the signer's ethereum address.
         let call_id = pic
@@ -1270,11 +1035,6 @@ mod test {
             )
             .unwrap();
 
-        pic.tick();
-        pic.tick();
-
-        let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
         let body = r#"
         {
             "Status": 0,
@@ -1293,25 +1053,13 @@ mod test {
         }
         "#
         .to_string();
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_requests[0].subnet_id,
-            request_id: canister_http_requests[0].request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, &body);
+        pic.tick();
+        mock_http_response(&pic, &body);
+        pic.tick();
+        mock_http_response(&pic, &body);
+        pic.tick();
 
-        pic.tick();
-        pic.tick();
-        pic.tick();
-        let canister_http_requests: Vec<pocket_ic::common::rest::CanisterHttpRequest> =
-            pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
         let mut body = r#"
         {
             "Status": 0,
@@ -1339,20 +1087,11 @@ mod test {
         "#
         .to_string();
         body = body.replace("{{BASE64}}", &public_key_der_base64);
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, &body);
+        pic.tick();
+        mock_http_response(&pic, &body);
 
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         let res = match reply {
             WasmResult::Reply(data) => {
                 let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
@@ -1367,7 +1106,6 @@ mod test {
         // There should be no more pending canister http outcalls.
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 0);
-        println!("{:?}", res);
         let signature = hex::decode(&res.signature[2..]).unwrap();
         let signature_bytes: [u8; 64] = signature[0..64].try_into().unwrap();
         let signature_bytes_64 = libsecp256k1::Signature::parse_standard(&signature_bytes).unwrap();
@@ -1392,53 +1130,8 @@ mod test {
     }
 
     #[test]
-    fn test_revoke_invalid_case() {
-        // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        // We retrieve the app subnet ID from the topology.
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create empty canisters as the anonymous principal and add cycles.
-        let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
-        let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
-        // We create a canister on the app subnet.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        pic.install_canister(
-            poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            canister_id,
-            include_bytes!(
-                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
-            )
-            .to_vec(),
-            Encode!(
-                &Some(Environment::Production),
-                &poseidon_canister_id.to_string(),
-                &dns_client_canister_id.to_string()
-            )
-            .unwrap(),
-            None,
-        );
+    fn test_revoke_key_mismatch_case() {
+        let (pic, canister_id) = test_setup();
 
         // Init the signer's ethereum address.
         let call_id = pic
@@ -1464,12 +1157,6 @@ mod test {
             )
             .unwrap();
 
-        pic.tick();
-        pic.tick();
-
-        let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
         let body = r#"
         {
             "Status": 0,
@@ -1496,36 +1183,14 @@ mod test {
         }
         "#
         .to_string();
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
-
+        mock_http_response(&pic, &body);
         pic.tick();
+        mock_http_response(&pic, &body);
         pic.tick();
+        mock_http_response(&pic, &body);
         pic.tick();
-        let canister_http_requests: Vec<pocket_ic::common::rest::CanisterHttpRequest> =
-            pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, &body);
+        pic.tick();
 
         let reply = pic.await_call(call_id).unwrap();
         match reply {
@@ -1539,52 +1204,7 @@ mod test {
 
     #[test]
     fn test_sign_gmail_invalid_selector() {
-        // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        // We retrieve the app subnet ID from the topology.
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create empty canisters as the anonymous principal and add cycles.
-        let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
-        let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
-        // We create a canister on the app subnet.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        pic.install_canister(
-            poseidon_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            dns_client_canister_id,
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
-            vec![],
-            None,
-        );
-        pic.install_canister(
-            canister_id,
-            include_bytes!(
-                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
-            )
-            .to_vec(),
-            Encode!(
-                &Some(Environment::Production),
-                &poseidon_canister_id.to_string(),
-                &dns_client_canister_id.to_string()
-            )
-            .unwrap(),
-            None,
-        );
+        let (pic, canister_id) = test_setup();
 
         // Init the signer's ethereum address.
         let call_id = pic
@@ -1613,7 +1233,6 @@ mod test {
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 0);
         let reply = pic.await_call(call_id).unwrap();
-        println!("{:?}", reply);
         match reply {
             WasmResult::Reply(data) => {
                 let res: Result<SignedDkimPublicKey, String> = decode_one(&data).unwrap();
@@ -1641,5 +1260,75 @@ mod test {
         eth_message.extend_from_slice(msg_bytes);
         let hash = raw_keccak256(eth_message).to_vec();
         hash.try_into().unwrap()
+    }
+
+    fn test_setup() -> (PocketIc, Principal) {
+        // We create a PocketIC instance consisting of the NNS, II, and one application subnet.
+        let pic = PocketIcBuilder::new()
+            .with_nns_subnet()
+            .with_ii_subnet() // this subnet has ECDSA keys
+            .with_application_subnet()
+            .build();
+
+        // We retrieve the app subnet ID from the topology.
+        let topology = pic.topology();
+        let app_subnet = topology.get_app_subnets()[0];
+
+        // Create empty canisters as the anonymous principal and add cycles.
+        let poseidon_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
+        pic.add_cycles(poseidon_canister_id, 2_000_000_000_000);
+        let dns_client_canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
+        pic.add_cycles(dns_client_canister_id, 2_000_000_000_000);
+        // We create a canister on the app subnet.
+        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
+        assert_eq!(pic.get_subnet(canister_id), Some(app_subnet));
+        pic.add_cycles(canister_id, 2_000_000_000_000);
+        pic.install_canister(
+            poseidon_canister_id,
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/poseidon.wasm").to_vec(),
+            vec![],
+            None,
+        );
+        pic.install_canister(
+            dns_client_canister_id,
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec(),
+            vec![],
+            None,
+        );
+        pic.install_canister(
+            canister_id,
+            include_bytes!(
+                "../../../target/wasm32-unknown-unknown/debug/ic_dns_oracle_backend.wasm"
+            )
+            .to_vec(),
+            Encode!(
+                &Some(Environment::Production),
+                &poseidon_canister_id.to_string(),
+                &dns_client_canister_id.to_string()
+            )
+            .unwrap(),
+            None,
+        );
+        (pic, canister_id)
+    }
+
+    fn mock_http_response(pic: &PocketIc, body: &str) {
+        pic.tick();
+        pic.tick();
+
+        let canister_http_requests = pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 1);
+        let canister_http_request = &canister_http_requests[0];
+        let mock_canister_http_response = MockCanisterHttpResponse {
+            subnet_id: canister_http_request.subnet_id,
+            request_id: canister_http_request.request_id,
+            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                status: 200,
+                headers: vec![],
+                body: body.as_bytes().to_vec(),
+            }),
+            additional_responses: vec![],
+        };
+        pic.mock_canister_http_response(mock_canister_http_response);
     }
 }

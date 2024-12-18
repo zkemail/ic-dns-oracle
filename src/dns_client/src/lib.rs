@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use base64::{engine::general_purpose, Engine as _};
 use candid::Nat;
 use ic_cdk::api::management_canister::http_request::{
@@ -54,15 +56,15 @@ pub async fn get_dkim_public_key(
         return Err("Invalid selector".to_string());
     }
 
-    #[cfg(not(debug_assertions))]
+    // #[cfg(not(debug_assertions))]
     let prefixes = vec![
         "https://dns.google/resolve",
         "https://cloudflare-dns.com/dns-query",
         "https://dns.nextdns.io/dns-query",
     ];
 
-    #[cfg(debug_assertions)]
-    let prefixes = vec!["https://dns.google/resolve"];
+    // #[cfg(debug_assertions)]
+    // let prefixes = vec!["https://dns.google/resolve"];
 
     let seed = ic_cdk::api::time() as usize % prefixes.len();
     let mut shuffled_prefixes = vec![];
@@ -70,7 +72,8 @@ pub async fn get_dkim_public_key(
         shuffled_prefixes.push(prefixes[(seed + i) % prefixes.len()]);
     }
 
-    let mut errors = vec![];
+    let mut logs = vec![];
+    let mut pubkey_votes = vec![];
     for prefix in shuffled_prefixes {
         let request = _construct_request(prefix, &selector, &domain);
         match http_request(request, cycle as u128).await {
@@ -81,23 +84,34 @@ pub async fn get_dkim_public_key(
                         "[Access to {prefix}] The response status is {}.",
                         response.status
                     );
-                    errors.push(message);
+                    logs.push(message);
                     continue;
                 }
                 let pubkey_hex = "0x".to_string() + &hex::encode(&response.body);
-                return Ok(pubkey_hex);
+                // if the same pubkey is voted by two different dns resolvers, the same pubkey should be contained in pubkey_votes.
+                if pubkey_votes.contains(&pubkey_hex) {
+                    return Ok(pubkey_hex);
+                } else {
+                    pubkey_votes.push(pubkey_hex);
+                }
+                let message: String = format!(
+                    "[Access to {prefix}] The response status is {}.",
+                    response.status
+                );
+                logs.push(message);
+                continue;
             }
             Err((r, m)) => {
                 let message = format!(
                     "[Access to {prefix}] The http_request resulted into error. RejectionCode: {r:?}, Error: {m}."
                 );
-                errors.push(message);
+                logs.push(message);
                 continue;
             }
         }
     }
     // Return the error as a string and end the method.
-    return Err(errors.join("\n"));
+    return Err(logs.join("\n"));
 }
 
 /// Transforms the raw HTTP response into a structured `HttpResponse`.
@@ -248,26 +262,12 @@ mod test {
     use candid::{decode_one, Encode, Principal};
     use pocket_ic::{
         common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse},
-        PocketIcBuilder, WasmResult,
+        PocketIc, PocketIcBuilder, WasmResult,
     };
 
     #[test]
-    fn test_dns_client_gmail() {
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create an empty canister as the anonymous principal and add cycles.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
-        pic.install_canister(canister_id, wasm_bytes, vec![], None);
+    fn test_dns_client_gmail_two_responses() {
+        let (pic, canister_id) = test_setup();
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
         let call_id = pic
@@ -278,14 +278,7 @@ mod test {
                 Encode!(&"20230601", &"gmail.com", &1_000_000_000_000u64).unwrap(),
             )
             .unwrap();
-        // We need a pair of ticks for the test canister method to make the http outcall
-        // and for the management canister to start processing the http outcall.
-        pic.tick();
-        pic.tick();
-        let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
-        println!("{:?}", canister_http_request);
+
         let body = r#"
             {
                 "Status": 0,
@@ -311,17 +304,9 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, body);
+        pic.tick();
+        mock_http_response(&pic, body);
 
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
@@ -339,23 +324,8 @@ mod test {
     }
 
     #[test]
-    fn test_dns_client_expect_error_no_answer() {
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create an empty canister as the anonymous principal and add cycles.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
-        pic.install_canister(canister_id, wasm_bytes, vec![], None);
-
+    fn test_dns_client_gmail_single_answer() {
+        let (pic, canister_id) = test_setup();
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
         let call_id = pic
@@ -366,13 +336,100 @@ mod test {
                 Encode!(&"20230601", &"gmail.com", &1_000_000_000_000u64).unwrap(),
             )
             .unwrap();
-        // We need a pair of ticks for the test canister method to make the http outcall
-        // and for the management canister to start processing the http outcall.
+
+        let body = r#"
+            {
+                "Status": 0,
+                "TC": false,
+                "RD": true,
+                "RA": true,
+                "AD": false,
+                "CD": false,
+                "Question": [
+                    {
+                        "name": "20230601._domainkey.gmail.com.",
+                        "type": 16
+                    }
+                ],
+                "Answer": [
+                    {
+                        "name": "20230601._domainkey.gmail.com.",
+                        "type": 16,
+                        "TTL": 3600,
+                        "data": "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAntvSKT1hkqhKe0xcaZ0x+QbouDsJuBfby/S82jxsoC/SodmfmVs2D1KAH3mi1AqdMdU12h2VfETeOJkgGYq5ljd996AJ7ud2SyOLQmlhaNHH7Lx+Mdab8/zDN1SdxPARDgcM7AsRECHwQ15R20FaKUABGu4NTbR2fDKnYwiq5jQyBkLWP+LgGOgfUF4T4HZb2PY2bQtEP6QeqOtcW4rrsH24L7XhD+HSZb1hsitrE0VPbhJzxDwI4JF815XMnSVjZgYUXP8CxI1Y0FONlqtQYgsorZ9apoW1KPQe8brSSlRsi9sXB/tu56LmG7tEDNmrZ5XUwQYUUADBOu7t1niwXwIDAQAB"
+                    }
+                ],
+                "Comment": "Response from 216.239.32.10."
+            }
+            "#;
+        mock_http_response(&pic, body);
         pic.tick();
+        let body = r#"
+        {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+                {
+                    "name": "20230601._domainkey.gmail.com.",
+                    "type": 16
+                }
+            ],
+            "Comment": "Response from 216.239.32.10."
+        }
+        "#;
+        mock_http_response(&pic, body);
         pic.tick();
+        let body = r#"
+        {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+                {
+                    "name": "20230601._domainkey.gmail.com.",
+                    "type": 16
+                }
+            ],
+            "Comment": "Response from 216.239.32.10."
+        }
+        "#;
+        mock_http_response(&pic, body);
+        // Now the test canister will receive the http outcall response
+        // and reply to the ingress message from the test driver.
+        let reply = pic.await_call(call_id).unwrap();
+        match reply {
+            WasmResult::Reply(data) => {
+                let http_response: Result<String, String> = decode_one(&data).unwrap();
+                assert!(http_response.is_err());
+            }
+            WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
+        };
+        // There should be no more pending canister http outcalls.
         let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
+        assert_eq!(canister_http_requests.len(), 0);
+    }
+
+    #[test]
+    fn test_dns_client_expect_error_no_answer() {
+        let (pic, canister_id) = test_setup();
+        // Submit an update call to the test canister making a canister http outcall
+        // and mock a canister http outcall response.
+        let call_id = pic
+            .submit_call(
+                canister_id,
+                Principal::anonymous(),
+                "get_dkim_public_key",
+                Encode!(&"20230601", &"gmail.com", &1_000_000_000_000u64).unwrap(),
+            )
+            .unwrap();
+
         let body = r#"
             {
                 "Status": 0,
@@ -390,17 +447,11 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, body);
+        pic.tick();
+        mock_http_response(&pic, body);
+        pic.tick();
+        mock_http_response(&pic, body);
 
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
@@ -419,22 +470,7 @@ mod test {
 
     #[test]
     fn test_dns_client_expect_error_invalid_key_type() {
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create an empty canister as the anonymous principal and add cycles.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
-        pic.install_canister(canister_id, wasm_bytes, vec![], None);
-
+        let (pic, canister_id) = test_setup();
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
         let call_id = pic
@@ -445,13 +481,7 @@ mod test {
                 Encode!(&"20230601", &"gmail.com", &1_000_000_000_000u64).unwrap(),
             )
             .unwrap();
-        // We need a pair of ticks for the test canister method to make the http outcall
-        // and for the management canister to start processing the http outcall.
-        pic.tick();
-        pic.tick();
-        let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
+
         let body = r#"
             {
                 "Status": 0,
@@ -477,17 +507,11 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, body);
+        pic.tick();
+        mock_http_response(&pic, body);
+        pic.tick();
+        mock_http_response(&pic, body);
 
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
@@ -506,21 +530,7 @@ mod test {
 
     #[test]
     fn test_dns_client_expect_error_invalid_base64_format() {
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create an empty canister as the anonymous principal and add cycles.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
-        pic.install_canister(canister_id, wasm_bytes, vec![], None);
+        let (pic, canister_id) = test_setup();
 
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
@@ -532,13 +542,7 @@ mod test {
                 Encode!(&"20230601", &"gmail.com", &1_000_000_000_000u64).unwrap(),
             )
             .unwrap();
-        // We need a pair of ticks for the test canister method to make the http outcall
-        // and for the management canister to start processing the http outcall.
-        pic.tick();
-        pic.tick();
-        let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 1);
-        let canister_http_request = &canister_http_requests[0];
+
         let body = r#"
             {
                 "Status": 0,
@@ -564,17 +568,11 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
-        let mock_canister_http_response = MockCanisterHttpResponse {
-            subnet_id: canister_http_request.subnet_id,
-            request_id: canister_http_request.request_id,
-            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
-                status: 200,
-                headers: vec![],
-                body: body.as_bytes().to_vec(),
-            }),
-            additional_responses: vec![],
-        };
-        pic.mock_canister_http_response(mock_canister_http_response);
+        mock_http_response(&pic, body);
+        pic.tick();
+        mock_http_response(&pic, body);
+        pic.tick();
+        mock_http_response(&pic, body);
 
         // Now the test canister will receive the http outcall response
         // and reply to the ingress message from the test driver.
@@ -593,21 +591,7 @@ mod test {
 
     #[test]
     fn test_dns_client_expect_error_invalid_selector() {
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create an empty canister as the anonymous principal and add cycles.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
-        pic.install_canister(canister_id, wasm_bytes, vec![], None);
+        let (pic, canister_id) = test_setup();
 
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
@@ -640,21 +624,7 @@ mod test {
 
     #[test]
     fn test_dns_client_expect_error_invalid_domain() {
-        let pic = PocketIcBuilder::new()
-            .with_nns_subnet()
-            .with_ii_subnet() // this subnet has ECDSA keys
-            .with_application_subnet()
-            .build();
-
-        let topology = pic.topology();
-        let app_subnet = topology.get_app_subnets()[0];
-
-        // Create an empty canister as the anonymous principal and add cycles.
-        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
-        pic.add_cycles(canister_id, 2_000_000_000_000);
-        let wasm_bytes =
-            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
-        pic.install_canister(canister_id, wasm_bytes, vec![], None);
+        let (pic, canister_id) = test_setup();
 
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
@@ -683,5 +653,45 @@ mod test {
         // There should be no more pending canister http outcalls.
         let canister_http_requests = pic.get_canister_http();
         assert_eq!(canister_http_requests.len(), 0);
+    }
+
+    fn test_setup() -> (PocketIc, Principal) {
+        let pic = PocketIcBuilder::new()
+            .with_nns_subnet()
+            .with_ii_subnet() // this subnet has ECDSA keys
+            .with_application_subnet()
+            .build();
+
+        let topology = pic.topology();
+        let app_subnet = topology.get_app_subnets()[0];
+
+        // Create an empty canister as the anonymous principal and add cycles.
+        let canister_id = pic.create_canister_on_subnet(None, None, app_subnet);
+        pic.add_cycles(canister_id, 2_000_000_000_000);
+        let wasm_bytes =
+            include_bytes!("../../../target/wasm32-unknown-unknown/debug/dns_client.wasm").to_vec();
+        pic.install_canister(canister_id, wasm_bytes, vec![], None);
+        (pic, canister_id)
+    }
+
+    fn mock_http_response(pic: &PocketIc, body: &str) {
+        // We need a pair of ticks for the test canister method to make the http outcall
+        // and for the management canister to start processing the http outcall.
+        pic.tick();
+        pic.tick();
+        let canister_http_requests = pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 1);
+        let canister_http_request = &canister_http_requests[0];
+        let mock_canister_http_response = MockCanisterHttpResponse {
+            subnet_id: canister_http_request.subnet_id,
+            request_id: canister_http_request.request_id,
+            response: CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                status: 200,
+                headers: vec![],
+                body: body.as_bytes().to_vec(),
+            }),
+            additional_responses: vec![],
+        };
+        pic.mock_canister_http_response(mock_canister_http_response);
     }
 }
