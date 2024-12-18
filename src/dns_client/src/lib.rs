@@ -130,7 +130,7 @@ fn transform(raw: TransformArgs) -> HttpResponse {
         Err(e) => HttpResponse {
             status: Nat::from(500u64),
             body: e.as_bytes().to_vec(),
-            headers: _transform_headers(),
+            headers: vec![],
             ..Default::default()
         },
     }
@@ -218,41 +218,12 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
             return Ok(HttpResponse {
                 status: raw.response.status.clone(),
                 body: pubkey_bytes.n().to_bytes_be().to_vec(),
-                headers: _transform_headers(),
+                headers: vec![],
                 ..Default::default()
             });
         }
     }
     Err("No key found".to_string())
-}
-
-fn _transform_headers() -> Vec<HttpHeader> {
-    vec![
-        HttpHeader {
-            name: "Content-Security-Policy".to_string(),
-            value: "default-src 'self'".to_string(),
-        },
-        HttpHeader {
-            name: "Referrer-Policy".to_string(),
-            value: "strict-origin".to_string(),
-        },
-        HttpHeader {
-            name: "Permissions-Policy".to_string(),
-            value: "geolocation=(self)".to_string(),
-        },
-        HttpHeader {
-            name: "Strict-Transport-Security".to_string(),
-            value: "max-age=63072000".to_string(),
-        },
-        HttpHeader {
-            name: "X-Frame-Options".to_string(),
-            value: "DENY".to_string(),
-        },
-        HttpHeader {
-            name: "X-Content-Type-Options".to_string(),
-            value: "nosniff".to_string(),
-        },
-    ]
 }
 
 ic_cdk::export_candid!();
