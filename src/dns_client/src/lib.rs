@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use base64::{engine::general_purpose, Engine as _};
-use candid::Nat;
+use candid::{Nat, Principal};
 use ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse, TransformArgs,
     TransformContext,
@@ -44,7 +44,7 @@ pub async fn get_dkim_public_key(
             return Err("Insufficient cycles".to_string());
         }
     }
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(available_cycles);
+    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(CHARGED_CYCLE);
     if available_cycles != accepted_cycles {
         return Err("Fail to accept all available cycles".to_string());
     }
@@ -65,6 +65,10 @@ pub async fn get_dkim_public_key(
 
     // #[cfg(debug_assertions)]
     // let prefixes = vec!["https://dns.google/resolve"];
+    // let (seed_raw,): ([u8; 32],) = ic_cdk::call(Principal::management_canister(), "raw_rand", ())
+    //     .await
+    //     .expect("Failed to call the management canister");
+    // let seed = (seed_raw[0..16].iter().map(|&b| b as u128).sum::<u128>() % 3) as usize;
 
     let seed = ic_cdk::api::time() as usize % prefixes.len();
     let mut shuffled_prefixes = vec![];
@@ -154,7 +158,9 @@ fn _construct_request(prefix: &str, selector: &str, domain: &str) -> CanisterHtt
         value: "application/dns-json".to_string(),
     }];
 
-    let transform = TransformContext::from_name("transform".to_string(), vec![]);
+    let expected_name = format!("\"{}._domainkey.{}.\"", selector, domain);
+    let transform =
+        TransformContext::from_name("transform".to_string(), expected_name.as_bytes().to_vec());
     CanisterHttpRequestArgument {
         url: url.to_string(),
         method: HttpMethod::GET,
@@ -186,10 +192,27 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
         .as_array()
         .ok_or_else(|| "No array of Answer")?
         .to_vec();
+    let expected_name = String::from_utf8(raw.context).expect("context is not a valid utf8 string");
     for i in 0..answers.len() {
+        if let Some(name) = answers[i].get("name") {
+            if name.to_string() != expected_name {
+                continue;
+            }
+        }
+        if let Some(dns_type) = answers[i].get("type") {
+            if dns_type.to_string() != "16" {
+                continue;
+            }
+        }
         let data = answers[i]["data"].to_string();
         if let Some(k_caps) = Regex::new("k=([a-z]+)").unwrap().captures(&data) {
             if &k_caps[1] != "rsa" {
+                continue;
+            }
+        }
+
+        if let Some(v_caps) = Regex::new("v=([A-Z0-9]+)").unwrap().captures(&data) {
+            if &v_caps[1] != "DKIM1" {
                 continue;
             }
         }

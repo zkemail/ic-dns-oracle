@@ -25,7 +25,7 @@ pub fn public_key_hash(public_key_hex: String) -> Result<String, String> {
         }
     }
     // Accept all available cycles.
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(available_cycles);
+    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(CHARGED_CYCLE);
     if available_cycles != accepted_cycles {
         return Err("Fail to accept all available cycles".to_string());
     }
