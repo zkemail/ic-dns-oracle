@@ -65,12 +65,11 @@ pub async fn get_dkim_public_key(
 
     // #[cfg(debug_assertions)]
     // let prefixes = vec!["https://dns.google/resolve"];
-    // let (seed_raw,): ([u8; 32],) = ic_cdk::call(Principal::management_canister(), "raw_rand", ())
-    //     .await
-    //     .expect("Failed to call the management canister");
-    // let seed = (seed_raw[0..16].iter().map(|&b| b as u128).sum::<u128>() % 3) as usize;
-
-    let seed = ic_cdk::api::time() as usize % prefixes.len();
+    let (seed_raw,): ([u8; 32],) = ic_cdk::call(Principal::management_canister(), "raw_rand", ())
+        .await
+        .expect("Failed to call the management canister");
+    let seed = (seed_raw[0..16].iter().map(|&b| b as u128).sum::<u128>() % 3) as usize;
+    // let seed = ic_cdk::api::time() as usize % prefixes.len();
     let mut shuffled_prefixes = vec![];
     for i in 0..prefixes.len() {
         shuffled_prefixes.push(prefixes[(seed + i) % prefixes.len()]);
@@ -298,6 +297,8 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, body);
         pic.tick();
         mock_http_response(&pic, body);
@@ -356,6 +357,8 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, body);
         pic.tick();
         let body = r#"
@@ -441,6 +444,8 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, body);
         pic.tick();
         mock_http_response(&pic, body);
@@ -501,6 +506,8 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, body);
         pic.tick();
         mock_http_response(&pic, body);
@@ -562,6 +569,8 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, body);
         pic.tick();
         mock_http_response(&pic, body);

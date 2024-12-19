@@ -781,6 +781,8 @@ mod test {
                 "Comment": "Response from 216.239.32.10."
             }
             "#;
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, body);
         pic.tick();
         mock_http_response(&pic, body);
@@ -862,6 +864,8 @@ mod test {
         let body = r#"
             {"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16}],"Answer":[],"Comment":"Response from 216.239.38.99."}
             "#;
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, body);
         pic.tick();
         mock_http_response(&pic, body);
@@ -872,6 +876,8 @@ mod test {
         let body = r#"
             {"Status":0,"TC":false,"RD":true,"RA":true,"AD":false,"CD":false,"Question":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16}],"Answer":[{"name":"20230601._domainkey.zeroknowledge-fm.20230601.gappssmtp.com.","type":16,"TTL":3600,"data":"v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3gWcOhCm99qzN+h7/2+LeP3CLsJkQQ4EP/2mrceXle5pKq8uZmBl1U4d2Vxn4w+pWFANDLmcHolLboESLFqEL5N6ae7u9b236dW4zn9AFkXAGenTzQEeif9VUFtLAZ0Qh2eV7OQgz/vPj5IaNqJ7h9hpM9gO031fe4v+J0DLCE8Rgo7hXbNgJavctc0983DaCDQaznHZ44LZ6TtZv9TBs+QFvsy4+UCTfsuOtHzoEqOOuXsVXZKLP6B882XbEnBpXEF8QzV4J26HiAJFUbO3mAqZL2UeKC0hhzoIZqZXNG0BfuzOF0VLpDa18GYMUiu+LhEJPJO9D8zhzvQIHNrpGwIDAQAB"}],"Comment":"Response from 216.239.38.99."}
             "#;
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, body);
         pic.tick();
         mock_http_response(&pic, body);
@@ -986,6 +992,8 @@ mod test {
         "#
         .to_string();
         body = body.replace("{{BASE64}}", &public_key_der_base64);
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, &body);
         pic.tick();
         mock_http_response(&pic, &body);
@@ -1077,7 +1085,7 @@ mod test {
             "CD": false,
             "Question": [
                 {
-                    "name": "20230601._domainkey.gmail.com.",
+                    "name": "20230601.gmail.com.",
                     "type": 16
                 }
             ],
@@ -1085,6 +1093,8 @@ mod test {
         }
         "#
         .to_string();
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, &body);
         pic.tick();
         mock_http_response(&pic, &body);
@@ -1102,13 +1112,13 @@ mod test {
             "CD": false,
             "Question": [
                 {
-                    "name": "20230601._domainkey.gmail.com.",
+                    "name": "20230601._domainkey.gmail-com.20230601.gappssmtp.com.",
                     "type": 16
                 }
             ],
             "Answer": [
                 {
-                    "name": "20230601._domainkey.gmail.com.",
+                    "name": "20230601._domainkey.gmail-com.20230601.gappssmtp.com.",
                     "type": 16,
                     "TTL": 3600,
                     "data": "v=DKIM1; k=rsa; p={{BASE64}}"
@@ -1119,9 +1129,12 @@ mod test {
         "#
         .to_string();
         body = body.replace("{{BASE64}}", &public_key_der_base64);
+        pic.tick();
+        pic.tick();
         mock_http_response(&pic, &body);
         pic.tick();
         mock_http_response(&pic, &body);
+        pic.tick();
 
         let reply = pic.await_call(call_id).unwrap();
         let res = match reply {
@@ -1199,13 +1212,40 @@ mod test {
             "CD": false,
             "Question": [
                 {
-                    "name": "20230601._domainkey.gmail.com.",
+                    "name": "20230601.gmail.com.",
+                    "type": 16
+                }
+            ],
+            "Comment": "Response from 216.239.32.10."
+        }
+        "#
+        .to_string();
+        pic.tick();
+        pic.tick();
+        mock_http_response(&pic, &body);
+        pic.tick();
+        mock_http_response(&pic, &body);
+        pic.tick();
+        mock_http_response(&pic, &body);
+        pic.tick();
+
+        let body = r#"
+        {
+            "Status": 0,
+            "TC": false,
+            "RD": true,
+            "RA": true,
+            "AD": false,
+            "CD": false,
+            "Question": [
+                {
+                    "name": "20230601._domainkey.gmail-com.20230601.gappssmtp.com.",
                     "type": 16
                 }
             ],
             "Answer": [
                 {
-                    "name": "20230601._domainkey.gmail.com.",
+                    "name": "20230601._domainkey.gmail-com.20230601.gappssmtp.com.",
                     "type": 16,
                     "TTL": 3600,
                     "data": "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAntvSKT1hkqhKe0xcaZ0x+QbouDsJuBfby/S82jxsoC/SodmfmVs2D1KAH3mi1AqdMdU12h2VfETeOJkgGYq5ljd996AJ7ud2SyOLQmlhaNHH7Lx+Mdab8/zDN1SdxPARDgcM7AsRECHwQ15R20FaKUABGu4NTbR2fDKnYwiq5jQyBkLWP+LgGOgfUF4T4HZb2PY2bQtEP6QeqOtcW4rrsH24L7XhD+HSZb1hsitrE0VPbhJzxDwI4JF815XMnSVjZgYUXP8CxI1Y0FONlqtQYgsorZ9apoW1KPQe8brSSlRsi9sXB/tu56LmG7tEDNmrZ5XUwQYUUADBOu7t1niwXwIDAQAB"
@@ -1215,14 +1255,11 @@ mod test {
         }
         "#
         .to_string();
-        mock_http_response(&pic, &body);
+        pic.tick();
         pic.tick();
         mock_http_response(&pic, &body);
         pic.tick();
         mock_http_response(&pic, &body);
-        pic.tick();
-        mock_http_response(&pic, &body);
-        pic.tick();
 
         let reply = pic.await_call(call_id).unwrap();
         match reply {
