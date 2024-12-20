@@ -2,9 +2,9 @@ use ff::PrimeField;
 use hex;
 use poseidon_rs::*;
 
-// consumed cycle for public_key_hash: 17_610_659 cycles
-// the consumed cycle * 1.5 is charged cycle = 26_415_989 cycles
-pub const CHARGED_CYCLE: u128 = 26_415_989;
+// consumed cycle for public_key_hash: 35_297_893 cycles
+// the consumed cycle * 1.5 is charged cycle = 52_946_839 cycles
+pub const CHARGED_CYCLE: u128 = 52_946_839;
 
 /// Computes the hash of the given public key.
 ///
@@ -26,8 +26,8 @@ pub fn public_key_hash(public_key_hex: String) -> Result<String, String> {
     }
     // Accept all available cycles.
     let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(CHARGED_CYCLE);
-    if available_cycles != accepted_cycles {
-        return Err("Fail to accept all available cycles".to_string());
+    if CHARGED_CYCLE != accepted_cycles {
+        return Err("Fail to accept the charged cycles".to_string());
     }
     _public_key_hash(public_key_hex)
 }

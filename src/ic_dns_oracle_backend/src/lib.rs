@@ -9,29 +9,23 @@ use rsa::{pkcs1::DecodeRsaPrivateKey, traits::PublicKeyParts, BigUint, RsaPrivat
 use serde::Deserialize;
 use std::cell::RefCell;
 
-// consumed cycle for sign_dkim_public_key: 26_164_599_060 cycles
-// the consumed cycle * 1.5 is charged cycle = 39_246_898_590 cycles
-pub const SIGN_CHARGED_CYCLE1: u128 = 39_246_898_590;
+// consumed cycle for _sign_dkim_public_key: 28_471_604_004 cycles
+// the consumed cycle * 1.5 is charged cycle = 42_707_406_006 cycles
+// Note that you need to pay two times of the charged cycle for domains with gappssmtp.com.
+pub const SIGN_CHARGED_CYCLE: u128 = 42_707_406_006;
 
-// consumed cycle for sign_dkim_public_key: 26_164_599_060 cycles
-// the consumed cycle * 1.5 is charged cycle = 39_246_898_590 cycles
-pub const SIGN_CHARGED_CYCLE2: u128 = 39_246_898_590;
+// consumed cycle for _revoke_dkim_public_key: 26_292_304_416 cycles
+// the consumed cycle * 1.5 is charged cycle = 39_438_456_624 cycles
+// Note that you need to pay two times of the charged cycle for domains with gappssmtp.com.
+pub const REVOKE_CHARGED_CYCLE: u128 = 39_438_456_624;
 
-// consumed cycle for revoke_dkim_public_key: 26_254_964_417 cycles
-// the consumed cycle * 1.5 is charged cycle = 39_382_446_626 cycles
-pub const REVOKE_CHARGED_CYCLE1: u128 = 39_382_446_626;
+// consumed cycle for get_dkim_public_key: 1_490_795_884 cycles
+// the consumed cycle * 1.5 is charged cycle = 2_236_193_826 cycles
+pub const DNS_CLIENT_CHARGED_CYCLE: u128 = 2_236_193_826;
 
-// consumed cycle for revoke_dkim_public_key: 26_254_964_417 cycles
-// the consumed cycle * 1.5 is charged cycle = 39_382_446_626 cycles
-pub const REVOKE_CHARGED_CYCLE2: u128 = 39_382_446_626;
-
-// consumed cycle for get_dkim_public_key: 735_324_690 cycles
-// the consumed cycle * 1.5 is charged cycle = 1_102_987_035 cycles
-pub const DNS_CLIENT_CHARGED_CYCLE: u128 = 1_102_987_035;
-
-// consumed cycle for public_key_hash: 17_610_659 cycles
-// the consumed cycle * 1.5 is charged cycle = 26_415_989 cycles
-pub const POSEIDON_CHARGED_CYCLE: u128 = 26_415_989;
+// consumed cycle for public_key_hash: 35_297_893 cycles
+// the consumed cycle * 1.5 is charged cycle = 52_946_839 cycles
+pub const POSEIDON_CHARGED_CYCLE: u128 = 52_946_839;
 
 /// Structure representing a signature for a new DKIM public key.
 ///
@@ -267,14 +261,14 @@ pub async fn sign_dkim_public_key(
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     #[cfg(not(debug_assertions))]
     {
-        if available_cycles < SIGN_CHARGED_CYCLE1 {
+        if available_cycles < SIGN_CHARGED_CYCLE {
             return Err("Insufficient cycles".to_string());
         }
     }
     // Accept all available cycles.
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(SIGN_CHARGED_CYCLE1);
-    if available_cycles != accepted_cycles {
-        return Err("Fail to accept all available cycles".to_string());
+    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(SIGN_CHARGED_CYCLE);
+    if SIGN_CHARGED_CYCLE != accepted_cycles {
+        return Err("Fail to accept the charged cycles".to_string());
     }
     write_log(
         "sign_dkim_public_key",
@@ -299,14 +293,14 @@ pub async fn sign_dkim_public_key(
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     #[cfg(not(debug_assertions))]
     {
-        if available_cycles < SIGN_CHARGED_CYCLE2 {
+        if available_cycles < SIGN_CHARGED_CYCLE {
             return Err("Insufficient cycles".to_string());
         }
     }
     // Accept all available cycles.
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(SIGN_CHARGED_CYCLE2);
-    if available_cycles != accepted_cycles {
-        return Err("Fail to accept all available cycles".to_string());
+    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(SIGN_CHARGED_CYCLE);
+    if SIGN_CHARGED_CYCLE != accepted_cycles {
+        return Err("Fail to accept the charged cycles".to_string());
     }
     let error1 = match _sign_dkim_public_key(selector, domain_with_gappssmtp, domain.clone()).await
     {
@@ -473,14 +467,14 @@ pub async fn revoke_dkim_public_key(
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     #[cfg(not(debug_assertions))]
     {
-        if available_cycles < REVOKE_CHARGED_CYCLE1 {
+        if available_cycles < REVOKE_CHARGED_CYCLE {
             return Err("Insufficient cycles".to_string());
         }
     }
     // Accept all available cycles.
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(REVOKE_CHARGED_CYCLE1);
-    if available_cycles != accepted_cycles {
-        return Err("Fail to accept all available cycles".to_string());
+    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(REVOKE_CHARGED_CYCLE);
+    if REVOKE_CHARGED_CYCLE != accepted_cycles {
+        return Err("Fail to accept the charged cycles".to_string());
     }
     write_log(
         "revoke_dkim_public_key",
@@ -509,14 +503,14 @@ pub async fn revoke_dkim_public_key(
     let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     #[cfg(not(debug_assertions))]
     {
-        if available_cycles < REVOKE_CHARGED_CYCLE2 {
+        if available_cycles < REVOKE_CHARGED_CYCLE {
             return Err("Insufficient cycles".to_string());
         }
     }
     // Accept all available cycles.
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(REVOKE_CHARGED_CYCLE2);
-    if available_cycles != accepted_cycles {
-        return Err("Fail to accept all available cycles".to_string());
+    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(REVOKE_CHARGED_CYCLE);
+    if REVOKE_CHARGED_CYCLE != accepted_cycles {
+        return Err("Fail to accept the charged cycles".to_string());
     }
     let domain_with_gappssmtp =
         format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);
@@ -696,6 +690,7 @@ mod test {
     use candid::{decode_one, encode_one, Encode, Principal};
     use easy_hasher::easy_hasher::raw_keccak256;
     use hex;
+    use ic_cdk::api::management_canister::main::{CanisterIdRecord, CanisterInfoRequest};
     use libsecp256k1;
     use pocket_ic::{
         common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse},
@@ -956,6 +951,10 @@ mod test {
 
         // Submit an update call to the test canister making a canister http outcall
         // and mock a canister http outcall response.
+        println!(
+            "canister info {:?}",
+            pic.canister_status(canister_id, None).unwrap()
+        );
         let call_id = pic
             .submit_call(
                 canister_id,
@@ -1008,6 +1007,10 @@ mod test {
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
+        println!(
+            "canister info {:?}",
+            pic.canister_status(canister_id, None).unwrap()
+        );
         assert_eq!(res.selector, "20230601");
         assert_eq!(res.domain, "gmail.com");
         assert_eq!(res.public_key, public_key_hex);

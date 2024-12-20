@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use base64::{engine::general_purpose, Engine as _};
 use candid::{Nat, Principal};
 use ic_cdk::api::management_canister::http_request::{
@@ -16,9 +14,9 @@ const SELECTOR_REGEX: &str =
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
 const DOMAIN_REGEX: &str =
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
-// consumed cycle for get_dkim_public_key: 745_646_986 cycles
-// the consumed cycle * 1.479 is charged cycle = 1_102_987_035 cycles
-pub const CHARGED_CYCLE: u128 = 1_102_987_035;
+// consumed cycle for get_dkim_public_key: 1_490_795_884 cycles
+// the consumed cycle * 1.5 is charged cycle = 2_236_193_826 cycles
+pub const CHARGED_CYCLE: u128 = 2_236_193_826;
 
 /// Fetches the DKIM public key for the given selector and domain.
 ///
@@ -45,8 +43,8 @@ pub async fn get_dkim_public_key(
         }
     }
     let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(CHARGED_CYCLE);
-    if available_cycles != accepted_cycles {
-        return Err("Fail to accept all available cycles".to_string());
+    if CHARGED_CYCLE != accepted_cycles {
+        return Err("Fail to accept the charged cycles".to_string());
     }
     // Verify selector and domain
     if !Regex::new(SELECTOR_REGEX).unwrap().is_match(&selector) {
