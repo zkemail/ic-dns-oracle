@@ -17,17 +17,17 @@ pub const CHARGED_CYCLE: u128 = 52_946_839;
 /// A result containing the hashed public key as a hexadecimal string, or an error message.
 #[ic_cdk::update]
 pub fn public_key_hash(public_key_hex: String) -> Result<String, String> {
-    let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     #[cfg(not(debug_assertions))]
     {
+        let available_cycles = ic_cdk::api::call::msg_cycles_available128();
         if available_cycles < CHARGED_CYCLE {
             return Err("Insufficient cycles".to_string());
         }
-    }
-    // Accept all available cycles.
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(CHARGED_CYCLE);
-    if CHARGED_CYCLE != accepted_cycles {
-        return Err("Fail to accept the charged cycles".to_string());
+        // Accept all available cycles.
+        let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(CHARGED_CYCLE);
+        if CHARGED_CYCLE != accepted_cycles {
+            return Err("Fail to accept the charged cycles".to_string());
+        }
     }
     _public_key_hash(public_key_hex)
 }

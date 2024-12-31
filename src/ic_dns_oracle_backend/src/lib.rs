@@ -264,11 +264,11 @@ pub async fn sign_dkim_public_key(
         if available_cycles < SIGN_CHARGED_CYCLE {
             return Err("Insufficient cycles".to_string());
         }
-    }
-    // Accept all available cycles.
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(SIGN_CHARGED_CYCLE);
-    if SIGN_CHARGED_CYCLE != accepted_cycles {
-        return Err("Fail to accept the charged cycles".to_string());
+        // Accept all available cycles.
+        let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(SIGN_CHARGED_CYCLE);
+        if SIGN_CHARGED_CYCLE != accepted_cycles {
+            return Err("Fail to accept the charged cycles".to_string());
+        }
     }
     write_log(
         "sign_dkim_public_key",
@@ -290,17 +290,17 @@ pub async fn sign_dkim_public_key(
         }
         Err(e) => e,
     };
-    let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     #[cfg(not(debug_assertions))]
     {
+        let available_cycles = ic_cdk::api::call::msg_cycles_available128();
         if available_cycles < SIGN_CHARGED_CYCLE {
             return Err("Insufficient cycles".to_string());
         }
-    }
-    // Accept all available cycles.
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(SIGN_CHARGED_CYCLE);
-    if SIGN_CHARGED_CYCLE != accepted_cycles {
-        return Err("Fail to accept the charged cycles".to_string());
+        // Accept all available cycles.
+        let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(SIGN_CHARGED_CYCLE);
+        if SIGN_CHARGED_CYCLE != accepted_cycles {
+            return Err("Fail to accept the charged cycles".to_string());
+        }
     }
     let error1 = match _sign_dkim_public_key(selector, domain_with_gappssmtp, domain.clone()).await
     {
@@ -464,17 +464,17 @@ pub async fn revoke_dkim_public_key(
     domain: String,
     private_key_der_hex: String,
 ) -> Result<SignedRevocation, String> {
-    let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     #[cfg(not(debug_assertions))]
     {
+        let available_cycles = ic_cdk::api::call::msg_cycles_available128();
         if available_cycles < REVOKE_CHARGED_CYCLE {
             return Err("Insufficient cycles".to_string());
         }
-    }
-    // Accept all available cycles.
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(REVOKE_CHARGED_CYCLE);
-    if REVOKE_CHARGED_CYCLE != accepted_cycles {
-        return Err("Fail to accept the charged cycles".to_string());
+        // Accept all available cycles.
+        let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(REVOKE_CHARGED_CYCLE);
+        if REVOKE_CHARGED_CYCLE != accepted_cycles {
+            return Err("Fail to accept the charged cycles".to_string());
+        }
     }
     write_log(
         "revoke_dkim_public_key",
@@ -500,17 +500,17 @@ pub async fn revoke_dkim_public_key(
         }
         Err(e) => e,
     };
-    let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     #[cfg(not(debug_assertions))]
     {
+        let available_cycles = ic_cdk::api::call::msg_cycles_available128();
         if available_cycles < REVOKE_CHARGED_CYCLE {
             return Err("Insufficient cycles".to_string());
         }
-    }
-    // Accept all available cycles.
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(REVOKE_CHARGED_CYCLE);
-    if REVOKE_CHARGED_CYCLE != accepted_cycles {
-        return Err("Fail to accept the charged cycles".to_string());
+        // Accept all available cycles.
+        let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(REVOKE_CHARGED_CYCLE);
+        if REVOKE_CHARGED_CYCLE != accepted_cycles {
+            return Err("Fail to accept the charged cycles".to_string());
+        }
     }
     let domain_with_gappssmtp =
         format!("{}.{}.gappssmtp.com", &domain.replace(".", "-"), &selector);

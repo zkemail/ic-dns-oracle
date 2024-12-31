@@ -35,16 +35,16 @@ pub async fn get_dkim_public_key(
     domain: String,
     cycle: u64,
 ) -> Result<String, String> {
-    let available_cycles = ic_cdk::api::call::msg_cycles_available128();
     #[cfg(not(debug_assertions))]
     {
+        let available_cycles = ic_cdk::api::call::msg_cycles_available128();
         if available_cycles < CHARGED_CYCLE {
             return Err("Insufficient cycles".to_string());
         }
-    }
-    let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(CHARGED_CYCLE);
-    if CHARGED_CYCLE != accepted_cycles {
-        return Err("Fail to accept the charged cycles".to_string());
+        let accepted_cycles = ic_cdk::api::call::msg_cycles_accept128(CHARGED_CYCLE);
+        if CHARGED_CYCLE != accepted_cycles {
+            return Err("Fail to accept the charged cycles".to_string());
+        }
     }
     // Verify selector and domain
     if !Regex::new(SELECTOR_REGEX).unwrap().is_match(&selector) {
@@ -298,6 +298,7 @@ mod test {
         pic.tick();
         pic.tick();
         mock_http_response(&pic, body);
+        println!("res 1");
         pic.tick();
         mock_http_response(&pic, body);
 
