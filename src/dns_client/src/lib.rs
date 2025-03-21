@@ -14,9 +14,10 @@ const SELECTOR_REGEX: &str =
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
 const DOMAIN_REGEX: &str =
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
-// consumed cycle for get_dkim_public_key: 1_490_795_884 cycles
-// the consumed cycle * 1.5 is charged cycle = 2_236_193_826 cycles
-pub const CHARGED_CYCLE: u128 = 2_236_193_826;
+// Original consumed cycle: 1_490_795_884
+// New estimated consumed cycle with CNAME handling: 1_863_494_855
+// New charged cycle (consumed * 1.5): 2_795_242_282
+pub const CHARGED_CYCLE: u128 = 2_795_242_282;
 
 /// Fetches the DKIM public key for the given selector and domain.
 ///
@@ -189,58 +190,63 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
         .as_array()
         .ok_or_else(|| "No array of Answer")?
         .to_vec();
-    let expected_name = String::from_utf8(raw.context).expect("context is not a valid utf8 string");
-    for i in 0..answers.len() {
-        if let Some(name) = answers[i].get("name") {
-            if name.to_string() != expected_name {
-                continue;
-            }
-        }
-        if let Some(dns_type) = answers[i].get("type") {
-            if dns_type.to_string() != "16" {
-                continue;
-            }
-        }
-        let data = answers[i]["data"].to_string();
-        if let Some(k_caps) = Regex::new("k=([a-z]+)").unwrap().captures(&data) {
-            if &k_caps[1] != "rsa" {
-                continue;
-            }
-        }
 
-        if let Some(v_caps) = Regex::new("v=([A-Z0-9]+)").unwrap().captures(&data) {
-            if &v_caps[1] != "DKIM1" {
-                continue;
-            }
-        }
+    // Look for the DKIM record in all answers
+    for answer in answers {
+        if let Some(name) = answer.get("name") {
+            if name.to_string().contains("_domainkey") {
+                if let Some(dns_type) = answer.get("type") {
+                    if dns_type.to_string() == "16" {
+                        // TXT record
+                        let data = answer["data"].to_string();
+                        if let Some(k_caps) = Regex::new("k=([a-z]+)").unwrap().captures(&data) {
+                            if &k_caps[1] != "rsa" {
+                                continue;
+                            }
+                        }
 
-        if let Some(p_caps) = Regex::new(r#"p=([A-Za-z0-9\\+/" ]+);?"#)
-            .unwrap()
-            .captures(&data)
-        {
-            let remove_regex = Regex::new(r#"["\\ ]"#).unwrap();
-            let pubkey_base64 = p_caps.get(1).unwrap().as_str();
-            let pubkey_base64 = remove_regex.replace_all(pubkey_base64, "").to_string();
-            let pubkey_pkcs = general_purpose::STANDARD
-                .decode(&pubkey_base64)
-                .map_err(|e| {
-                    format!(
-                        "base64 decode of {} failed: {}",
-                        pubkey_base64,
-                        e.to_string()
-                    )
-                })?;
-            let pubkey_bytes = match RsaPublicKey::from_public_key_der(&pubkey_pkcs) {
-                Ok(pubkey) => pubkey,
-                Err(_) => RsaPublicKey::from_pkcs1_der(&pubkey_pkcs)
-                    .map_err(|e| format!("Invalid encoded rsa public key: {}", e.to_string()))?,
-            };
-            return Ok(HttpResponse {
-                status: raw.response.status.clone(),
-                body: pubkey_bytes.n().to_bytes_be().to_vec(),
-                headers: vec![],
-                ..Default::default()
-            });
+                        if let Some(v_caps) = Regex::new("v=([A-Z0-9]+)").unwrap().captures(&data) {
+                            if &v_caps[1] != "DKIM1" {
+                                continue;
+                            }
+                        }
+
+                        if let Some(p_caps) = Regex::new(r#"p=([A-Za-z0-9\\+/" ]+);?"#)
+                            .unwrap()
+                            .captures(&data)
+                        {
+                            let remove_regex = Regex::new(r#"["\\ ]"#).unwrap();
+                            let pubkey_base64 = p_caps.get(1).unwrap().as_str();
+                            let pubkey_base64 =
+                                remove_regex.replace_all(pubkey_base64, "").to_string();
+                            let pubkey_pkcs = general_purpose::STANDARD
+                                .decode(&pubkey_base64)
+                                .map_err(|e| {
+                                    format!(
+                                        "base64 decode of {} failed: {}",
+                                        pubkey_base64,
+                                        e.to_string()
+                                    )
+                                })?;
+                            let pubkey_bytes = match RsaPublicKey::from_public_key_der(&pubkey_pkcs)
+                            {
+                                Ok(pubkey) => pubkey,
+                                Err(_) => {
+                                    RsaPublicKey::from_pkcs1_der(&pubkey_pkcs).map_err(|e| {
+                                        format!("Invalid encoded rsa public key: {}", e.to_string())
+                                    })?
+                                }
+                            };
+                            return Ok(HttpResponse {
+                                status: raw.response.status.clone(),
+                                body: pubkey_bytes.n().to_bytes_be().to_vec(),
+                                headers: vec![],
+                                ..Default::default()
+                            });
+                        }
+                    }
+                }
+            }
         }
     }
     Err("No key found".to_string())
