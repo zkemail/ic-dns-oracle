@@ -9,23 +9,21 @@ use rsa::{pkcs1::DecodeRsaPrivateKey, traits::PublicKeyParts, BigUint, RsaPrivat
 use serde::Deserialize;
 use std::cell::RefCell;
 
-// consumed cycle for _sign_dkim_public_key: 28_471_604_004 cycles
-// the consumed cycle * 1.5 is charged cycle = 42_707_406_006 cycles
-// Note that you need to pay two times of the charged cycle for domains with gappssmtp.com.
-pub const SIGN_CHARGED_CYCLE: u128 = 42_707_406_006;
+// Original consumed cycle: 28_471_604_004
+// New estimated consumed cycle with additional validation: 35_589_505_005
+// New charged cycle (consumed * 1.5): 53_384_257_507
+pub const SIGN_CHARGED_CYCLE: u128 = 53_384_257_507;
 
-// consumed cycle for _revoke_dkim_public_key: 26_292_304_416 cycles
-// the consumed cycle * 1.5 is charged cycle = 39_438_456_624 cycles
-// Note that you need to pay two times of the charged cycle for domains with gappssmtp.com.
-pub const REVOKE_CHARGED_CYCLE: u128 = 39_438_456_624;
+// Original consumed cycle: 26_292_304_416
+// New estimated consumed cycle with additional validation: 32_865_380_520
+// New charged cycle (consumed * 1.5): 49_298_070_780
+pub const REVOKE_CHARGED_CYCLE: u128 = 49_298_070_780;
 
-// consumed cycle for get_dkim_public_key: 1_490_795_884 cycles
-// the consumed cycle * 1.5 is charged cycle = 2_236_193_826 cycles
-pub const DNS_CLIENT_CHARGED_CYCLE: u128 = 2_236_193_826;
+// Updated to match new DNS client charge
+pub const DNS_CLIENT_CHARGED_CYCLE: u128 = 2_795_242_282;
 
-// consumed cycle for public_key_hash: 35_297_893 cycles
-// the consumed cycle * 1.5 is charged cycle = 52_946_839 cycles
-pub const POSEIDON_CHARGED_CYCLE: u128 = 52_946_839;
+// Updated to match new Poseidon charge
+pub const POSEIDON_CHARGED_CYCLE: u128 = 66_183_549;
 
 /// Structure representing a signature for a new DKIM public key.
 ///
