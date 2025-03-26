@@ -14,9 +14,8 @@ const SELECTOR_REGEX: &str =
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
 const DOMAIN_REGEX: &str =
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
-// Original consumed cycle: 1_490_795_884
-// New estimated consumed cycle with CNAME handling: 1_863_494_855
-// New charged cycle (consumed * 1.5): 2_795_242_282
+
+// Charged cycle for DNS client operations
 pub const CHARGED_CYCLE: u128 = 3_494_052_853;
 const MAX_DNS_DEPTH: usize = 4;
 
