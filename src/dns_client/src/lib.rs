@@ -18,6 +18,7 @@ const DOMAIN_REGEX: &str =
 // New estimated consumed cycle with CNAME handling: 1_863_494_855
 // New charged cycle (consumed * 1.5): 2_795_242_282
 pub const CHARGED_CYCLE: u128 = 2_795_242_282;
+const MAX_DNS_DEPTH: usize = 4;
 
 /// Fetches the DKIM public key for the given selector and domain.
 ///
@@ -191,27 +192,40 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
         .ok_or_else(|| "No array of Answer")?
         .to_vec();
 
-    // Look for the DKIM record in all answers
-    for answer in answers {
-        if let Some(name) = answer.get("name") {
-            if name.to_string().contains("_domainkey") {
-                if let Some(dns_type) = answer.get("type") {
-                    if dns_type.to_string() == "16" {
-                        // TXT record
-                        let data = answer["data"].to_string();
-                        if let Ok(pubkey_bytes) = _parse_dkim_record(&data) {
-                            return Ok(HttpResponse {
-                                status: raw.response.status.clone(),
-                                body: pubkey_bytes,
-                                headers: vec![],
-                                ..Default::default()
-                            });
-                        }
+    let mut current_query_name =
+        String::from_utf8(raw.context).expect("context is not a valid utf8 string");
+
+    for _ in 0..=MAX_DNS_DEPTH {
+        if let Some(answer) = answers
+            .iter()
+            .find(|answer| answer["name"].to_string() == current_query_name)
+        {
+            match answer["type"].to_string().as_str() {
+                "16" => {
+                    // TXT record
+                    let data = answer["data"].to_string();
+                    if let Ok(pubkey_bytes) = _parse_dkim_record(&data) {
+                        return Ok(HttpResponse {
+                            status: raw.response.status.clone(),
+                            body: pubkey_bytes,
+                            headers: vec![],
+                            ..Default::default()
+                        });
                     }
                 }
+                "5" => {
+                    // CNAME record
+                    current_query_name = answer["data"].to_string();
+                }
+                _ => {
+                    return Err("Unsupported DNS record type".to_string());
+                }
             }
+        } else {
+            return Err("No answer found".to_string());
         }
     }
+
     Err("No key found".to_string())
 }
 
