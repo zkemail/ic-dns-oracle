@@ -2,12 +2,8 @@ use ff::PrimeField;
 use hex;
 use poseidon_rs::*;
 
-// consumed cycle for public_key_hash: 35_297_893 cycles
-// the consumed cycle * 1.5 is charged cycle = 52_946_839 cycles
-// Original consumed cycle: 35_297_893
-// New estimated consumed cycle with additional validation: 44_122_366
-// New charged cycle (consumed * 1.5): 66_183_549
-pub const CHARGED_CYCLE: u128 = 66_183_549;
+// Charged cycle for Poseidon hash operations
+pub const CHARGED_CYCLE: u128 = 82_729_436;
 
 /// Computes the hash of the given public key.
 ///

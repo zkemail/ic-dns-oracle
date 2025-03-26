@@ -9,21 +9,17 @@ use rsa::{pkcs1::DecodeRsaPrivateKey, traits::PublicKeyParts, BigUint, RsaPrivat
 use serde::Deserialize;
 use std::cell::RefCell;
 
-// Original consumed cycle: 28_471_604_004
-// New estimated consumed cycle with additional validation: 35_589_505_005
-// New charged cycle (consumed * 1.5): 53_384_257_507
-pub const SIGN_CHARGED_CYCLE: u128 = 53_384_257_507;
+// Charged cycle for signing DKIM public keys
+pub const SIGN_CHARGED_CYCLE: u128 = 66_730_321_884;
 
-// Original consumed cycle: 26_292_304_416
-// New estimated consumed cycle with additional validation: 32_865_380_520
-// New charged cycle (consumed * 1.5): 49_298_070_780
-pub const REVOKE_CHARGED_CYCLE: u128 = 49_298_070_780;
+// Charged cycle for revoking DKIM public keys
+pub const REVOKE_CHARGED_CYCLE: u128 = 61_622_588_475;
 
-// Updated to match new DNS client charge
-pub const DNS_CLIENT_CHARGED_CYCLE: u128 = 2_795_242_282;
+// Charged cycle for DNS client operations
+pub const DNS_CLIENT_CHARGED_CYCLE: u128 = 3_494_052_853;
 
-// Updated to match new Poseidon charge
-pub const POSEIDON_CHARGED_CYCLE: u128 = 66_183_549;
+// Charged cycle for Poseidon hash operations
+pub const POSEIDON_CHARGED_CYCLE: u128 = 82_729_436;
 
 /// Structure representing a signature for a new DKIM public key.
 ///
