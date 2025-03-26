@@ -199,47 +199,10 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
                     if dns_type.to_string() == "16" {
                         // TXT record
                         let data = answer["data"].to_string();
-                        if let Some(k_caps) = Regex::new("k=([a-z]+)").unwrap().captures(&data) {
-                            if &k_caps[1] != "rsa" {
-                                continue;
-                            }
-                        }
-
-                        if let Some(v_caps) = Regex::new("v=([A-Z0-9]+)").unwrap().captures(&data) {
-                            if &v_caps[1] != "DKIM1" {
-                                continue;
-                            }
-                        }
-
-                        if let Some(p_caps) = Regex::new(r#"p=([A-Za-z0-9\\+/" ]+);?"#)
-                            .unwrap()
-                            .captures(&data)
-                        {
-                            let remove_regex = Regex::new(r#"["\\ ]"#).unwrap();
-                            let pubkey_base64 = p_caps.get(1).unwrap().as_str();
-                            let pubkey_base64 =
-                                remove_regex.replace_all(pubkey_base64, "").to_string();
-                            let pubkey_pkcs = general_purpose::STANDARD
-                                .decode(&pubkey_base64)
-                                .map_err(|e| {
-                                    format!(
-                                        "base64 decode of {} failed: {}",
-                                        pubkey_base64,
-                                        e.to_string()
-                                    )
-                                })?;
-                            let pubkey_bytes = match RsaPublicKey::from_public_key_der(&pubkey_pkcs)
-                            {
-                                Ok(pubkey) => pubkey,
-                                Err(_) => {
-                                    RsaPublicKey::from_pkcs1_der(&pubkey_pkcs).map_err(|e| {
-                                        format!("Invalid encoded rsa public key: {}", e.to_string())
-                                    })?
-                                }
-                            };
+                        if let Ok(pubkey_bytes) = _parse_dkim_record(&data) {
                             return Ok(HttpResponse {
                                 status: raw.response.status.clone(),
-                                body: pubkey_bytes.n().to_bytes_be().to_vec(),
+                                body: pubkey_bytes,
                                 headers: vec![],
                                 ..Default::default()
                             });
@@ -250,6 +213,58 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
         }
     }
     Err("No key found".to_string())
+}
+
+/// Parses a DKIM record from DNS TXT record data and returns the public key bytes.
+///
+/// # Arguments
+///
+/// * `data` - The DNS TXT record data string containing the DKIM record
+///
+/// # Returns
+///
+/// A Result containing either the public key bytes or an error message
+fn _parse_dkim_record(data: &str) -> Result<Vec<u8>, String> {
+    // Check key type is RSA
+    if let Some(k_caps) = Regex::new("k=([a-z]+)").unwrap().captures(data) {
+        if &k_caps[1] != "rsa" {
+            return Err("Key type is not RSA".to_string());
+        }
+    }
+
+    // Verify DKIM version
+    if let Some(v_caps) = Regex::new("v=([A-Z0-9]+)").unwrap().captures(data) {
+        if &v_caps[1] != "DKIM1" {
+            return Err("DKIM version is not DKIM1".to_string());
+        }
+    }
+
+    // Extract and parse public key
+    if let Some(p_caps) = Regex::new(r#"p=([A-Za-z0-9\\+/" ]+);?"#)
+        .unwrap()
+        .captures(data)
+    {
+        let remove_regex = Regex::new(r#"["\\ ]"#).unwrap();
+        let pubkey_base64 = p_caps.get(1).unwrap().as_str();
+        let pubkey_base64 = remove_regex.replace_all(pubkey_base64, "").to_string();
+        let pubkey_pkcs = general_purpose::STANDARD
+            .decode(&pubkey_base64)
+            .map_err(|e| {
+                format!(
+                    "base64 decode of {} failed: {}",
+                    pubkey_base64,
+                    e.to_string()
+                )
+            })?;
+        let pubkey_bytes = match RsaPublicKey::from_public_key_der(&pubkey_pkcs) {
+            Ok(pubkey) => pubkey,
+            Err(_) => RsaPublicKey::from_pkcs1_der(&pubkey_pkcs)
+                .map_err(|e| format!("Invalid encoded rsa public key: {}", e.to_string()))?,
+        };
+        Ok(pubkey_bytes.n().to_bytes_be().to_vec())
+    } else {
+        Err("No public key found in DKIM record".to_string())
+    }
 }
 
 ic_cdk::export_candid!();
