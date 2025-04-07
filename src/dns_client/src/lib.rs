@@ -17,7 +17,6 @@ const DOMAIN_REGEX: &str =
 
 // Charged cycle for DNS client operations
 pub const CHARGED_CYCLE: u128 = 3_494_052_853;
-const MAX_DNS_DEPTH: usize = 4;
 
 /// Fetches the DKIM public key for the given selector and domain.
 ///
@@ -194,7 +193,9 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
     let mut current_query_name =
         String::from_utf8(raw.context).expect("context is not a valid utf8 string");
 
-    for _ in 0..=MAX_DNS_DEPTH {
+    let mut visited = std::collections::HashSet::new();
+    while !visited.contains(&current_query_name) {
+        visited.insert(current_query_name.clone());
         if let Some(answer) = answers
             .iter()
             .find(|answer| answer["name"].to_string() == current_query_name)
