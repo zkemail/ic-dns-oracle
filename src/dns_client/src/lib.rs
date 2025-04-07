@@ -14,9 +14,9 @@ const SELECTOR_REGEX: &str =
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
 const DOMAIN_REGEX: &str =
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$";
-// consumed cycle for get_dkim_public_key: 1_490_795_884 cycles
-// the consumed cycle * 1.5 is charged cycle = 2_236_193_826 cycles
-pub const CHARGED_CYCLE: u128 = 2_236_193_826;
+
+// Charged cycle for DNS client operations
+pub const CHARGED_CYCLE: u128 = 3_494_052_853;
 
 /// Fetches the DKIM public key for the given selector and domain.
 ///
@@ -189,61 +189,96 @@ fn _transform(raw: TransformArgs) -> Result<HttpResponse, String> {
         .as_array()
         .ok_or_else(|| "No array of Answer")?
         .to_vec();
-    let expected_name = String::from_utf8(raw.context).expect("context is not a valid utf8 string");
-    for i in 0..answers.len() {
-        if let Some(name) = answers[i].get("name") {
-            if name.to_string() != expected_name {
-                continue;
-            }
-        }
-        if let Some(dns_type) = answers[i].get("type") {
-            if dns_type.to_string() != "16" {
-                continue;
-            }
-        }
-        let data = answers[i]["data"].to_string();
-        if let Some(k_caps) = Regex::new("k=([a-z]+)").unwrap().captures(&data) {
-            if &k_caps[1] != "rsa" {
-                continue;
-            }
-        }
 
-        if let Some(v_caps) = Regex::new("v=([A-Z0-9]+)").unwrap().captures(&data) {
-            if &v_caps[1] != "DKIM1" {
-                continue;
-            }
-        }
+    let mut current_query_name =
+        String::from_utf8(raw.context).expect("context is not a valid utf8 string");
 
-        if let Some(p_caps) = Regex::new(r#"p=([A-Za-z0-9\\+/" ]+);?"#)
-            .unwrap()
-            .captures(&data)
+    let mut visited = std::collections::HashSet::new();
+    while !visited.contains(&current_query_name) {
+        visited.insert(current_query_name.clone());
+        if let Some(answer) = answers
+            .iter()
+            .find(|answer| answer["name"].to_string() == current_query_name)
         {
-            let remove_regex = Regex::new(r#"["\\ ]"#).unwrap();
-            let pubkey_base64 = p_caps.get(1).unwrap().as_str();
-            let pubkey_base64 = remove_regex.replace_all(pubkey_base64, "").to_string();
-            let pubkey_pkcs = general_purpose::STANDARD
-                .decode(&pubkey_base64)
-                .map_err(|e| {
-                    format!(
-                        "base64 decode of {} failed: {}",
-                        pubkey_base64,
-                        e.to_string()
-                    )
-                })?;
-            let pubkey_bytes = match RsaPublicKey::from_public_key_der(&pubkey_pkcs) {
-                Ok(pubkey) => pubkey,
-                Err(_) => RsaPublicKey::from_pkcs1_der(&pubkey_pkcs)
-                    .map_err(|e| format!("Invalid encoded rsa public key: {}", e.to_string()))?,
-            };
-            return Ok(HttpResponse {
-                status: raw.response.status.clone(),
-                body: pubkey_bytes.n().to_bytes_be().to_vec(),
-                headers: vec![],
-                ..Default::default()
-            });
+            match answer["type"].to_string().as_str() {
+                "16" => {
+                    // TXT record
+                    let data = answer["data"].to_string();
+                    if let Ok(pubkey_bytes) = _parse_dkim_record(&data) {
+                        return Ok(HttpResponse {
+                            status: raw.response.status.clone(),
+                            body: pubkey_bytes,
+                            headers: vec![],
+                            ..Default::default()
+                        });
+                    }
+                }
+                "5" => {
+                    // CNAME record
+                    current_query_name = answer["data"].to_string();
+                }
+                _ => {
+                    return Err("Unsupported DNS record type".to_string());
+                }
+            }
+        } else {
+            return Err("No answer found".to_string());
         }
     }
+
     Err("No key found".to_string())
+}
+
+/// Parses a DKIM record from DNS TXT record data and returns the public key bytes.
+///
+/// # Arguments
+///
+/// * `data` - The DNS TXT record data string containing the DKIM record
+///
+/// # Returns
+///
+/// A Result containing either the public key bytes or an error message
+fn _parse_dkim_record(data: &str) -> Result<Vec<u8>, String> {
+    // Check key type is RSA
+    if let Some(k_caps) = Regex::new("k=([a-z]+)").unwrap().captures(data) {
+        if &k_caps[1] != "rsa" {
+            return Err("Key type is not RSA".to_string());
+        }
+    }
+
+    // Verify DKIM version
+    if let Some(v_caps) = Regex::new("v=([A-Z0-9]+)").unwrap().captures(data) {
+        if &v_caps[1] != "DKIM1" {
+            return Err("DKIM version is not DKIM1".to_string());
+        }
+    }
+
+    // Extract and parse public key
+    if let Some(p_caps) = Regex::new(r#"p=([A-Za-z0-9\\+/" ]+);?"#)
+        .unwrap()
+        .captures(data)
+    {
+        let remove_regex = Regex::new(r#"["\\ ]"#).unwrap();
+        let pubkey_base64 = p_caps.get(1).unwrap().as_str();
+        let pubkey_base64 = remove_regex.replace_all(pubkey_base64, "").to_string();
+        let pubkey_pkcs = general_purpose::STANDARD
+            .decode(&pubkey_base64)
+            .map_err(|e| {
+                format!(
+                    "base64 decode of {} failed: {}",
+                    pubkey_base64,
+                    e.to_string()
+                )
+            })?;
+        let pubkey_bytes = match RsaPublicKey::from_public_key_der(&pubkey_pkcs) {
+            Ok(pubkey) => pubkey,
+            Err(_) => RsaPublicKey::from_pkcs1_der(&pubkey_pkcs)
+                .map_err(|e| format!("Invalid encoded rsa public key: {}", e.to_string()))?,
+        };
+        Ok(pubkey_bytes.n().to_bytes_be().to_vec())
+    } else {
+        Err("No public key found in DKIM record".to_string())
+    }
 }
 
 ic_cdk::export_candid!();

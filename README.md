@@ -13,7 +13,7 @@ Our repository contains the implementations of theee canisters as follows:
 Our IC DNS oracle backend canister is available at https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=fxmww-qiaaa-aaaaj-azu7a-cai.
 Once you prepare your identity and wallet on ICP, you can obtain the signature for the hash of the public key registered on DNS for the pair of the selector 20230601 and the domain gmail.com by calling the following command:
 ```
-dfx canister call fxmww-qiaaa-aaaaj-azu7a-cai sign_dkim_public_key '("20230601", "gmail.com")'  --network ic --with-cycles 85_414_812_012 --wallet <YOUR_WALLET_CANISTER_ID>
+dfx canister call fxmww-qiaaa-aaaaj-azu7a-cai sign_dkim_public_key '("20230601", "gmail.com")'  --network ic --with-cycles 133_460_643_768 --wallet <YOUR_WALLET_CANISTER_ID>
 ``` 
 
 You can verify it as the ECDSA signature from 0x6293a80bf4bd3fff995a0cab74cbf281d922da02, which is the signer's Ethereum address output by the `get_signer_ethereum_address` function.
@@ -33,10 +33,10 @@ Specifically, each function requires the following amount of cycles.
 
 | Function Name | Required Cycles |
 |---------------|-----------------|
-| public_key_hash | 52_946_839      |
-| get_dkim_public_key | 2_236_193_826 |
-| sign_dkim_public_key | 42_707_406_006 (normal domain) / 85_414_812_012 (domain with gappssmtp.com) |
-| revoke_dkim_public_key | 39_438_456_624 (normal domain) / 78_876_913_248 (domain with gappssmtp.com) |
+| public_key_hash | 82_729_436 |
+| get_dkim_public_key | 3_494_052_853 |
+| sign_dkim_public_key | 66_730_321_884 (normal domain) / 133_460_643_768 (domain with gappssmtp.com) |
+| revoke_dkim_public_key | 61_622_588_475 (normal domain) / 123_245_176_950 (domain with gappssmtp.com) |
 
 ## References
 - [Quick Start](https://internetcomputer.org/docs/quickstart/quickstart-intro)
