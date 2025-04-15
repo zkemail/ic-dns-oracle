@@ -448,6 +448,72 @@ mod test {
     }
 
     #[test]
+    fn test_dns_client_outlook_cname_resolution() {
+        let (pic, canister_id) = test_setup();
+        // Submit an update call to the test canister making a canister http outcall
+        let call_id = pic
+            .submit_call(
+                canister_id,
+                Principal::anonymous(),
+                "get_dkim_public_key",
+                Encode!(&"selector1", &"outlook.com", &1_000_000_000_000u64).unwrap(),
+            )
+            .unwrap();
+
+        let body = r#"
+            {
+                "Status": 0,
+                "TC": false,
+                "RD": true,
+                "RA": true,
+                "AD": false,
+                "CD": false,
+                "Question": [
+                    {
+                        "name": "selector1._domainkey.outlook.com.",
+                        "type": 16
+                    }
+                ],
+                "Answer": [
+                    {
+                        "name": "selector1._domainkey.outlook.com.",
+                        "type": 5,
+                        "TTL": 300,
+                        "data": "selector1._domainkey.outbound.protection.outlook.com."
+                    },
+                    {
+                        "name": "selector1._domainkey.outbound.protection.outlook.com.",
+                        "type": 16,
+                        "TTL": 600,
+                        "data": "v=DKIM1;k=rsa;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvWyktrIL8DO/+UGvMbv7cPd/Xogpbs7pgVw8y9ldO6AAMmg8+ijENl/c7Fb1MfKM7uG3LMwAr0dVVKyM+mbkoX2k5L7lsROQr0Z9gGSpu7xrnZOa58+/pIhd2Xk/DFPpa5+TKbWodbsSZPRN8z0RY5x59jdzSclXlEyN9mEZdmOiKTsOP6A7vQxfSya9jg5N81dfNNvP7HnWejMMsKyIMrXptxOhIBuEYH67JDe98QgX14oHvGM2Uz53if/SW8MF09rYh9sp4ZsaWLIg6T343JzlbtrsGRGCDJ9JPpxRWZimtz+Up/BlKzT6sCCrBihb/Bi3pZiEBB4Ui/vruL5RCQIDAQAB"
+                    }
+                ],
+                "Comment": "Response from 150.171.16.36."
+            }
+            "#;
+        pic.tick();
+        pic.tick();
+        mock_http_response(&pic, body);
+        println!("res 1");
+        pic.tick();
+        mock_http_response(&pic, body);
+
+        // Now the test canister will receive the http outcall response
+        // and reply to the ingress message from the test driver.
+        let reply = pic.await_call(call_id).unwrap();
+        match reply {
+            WasmResult::Reply(data) => {
+                let http_response: Result<String, String> = decode_one(&data).unwrap();
+                assert_eq!(http_response.unwrap(), "0xbd6ca4b6b20bf033bff941af31bbfb70f77f5e88296ecee9815c3ccbd95d3ba00032683cfa28c4365fdcec56f531f28ceee1b72ccc00af475554ac8cfa66e4a17da4e4bee5b11390af467d8064a9bbbc6b9d939ae7cfbfa4885dd9793f0c53e96b9f9329b5a875bb1264f44df33d11639c79f6377349c957944c8df661197663a2293b0e3fa03bbd0c5f4b26bd8e0e4df3575f34dbcfec79d67a330cb0ac8832b5e9b713a1201b84607ebb2437bdf10817d78a07bc6336533e7789ffd25bc305d3dad887db29e19b1a58b220e93df8dc9ce56edaec1911820c9f493e9c515998a6b73f94a7f0652b34fab020ab06285bfc18b7a59884041e148bfbebb8be5109");
+            }
+            WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
+        };
+        // There should be no more pending canister http outcalls.
+        let canister_http_requests = pic.get_canister_http();
+        assert_eq!(canister_http_requests.len(), 0);
+    }
+
+    #[test]
     fn test_dns_client_expect_error_no_answer() {
         let (pic, canister_id) = test_setup();
         // Submit an update call to the test canister making a canister http outcall
@@ -684,72 +750,6 @@ mod test {
             WasmResult::Reply(data) => {
                 let http_response: Result<String, String> = decode_one(&data).unwrap();
                 assert!(http_response.is_err());
-            }
-            WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
-        };
-        // There should be no more pending canister http outcalls.
-        let canister_http_requests = pic.get_canister_http();
-        assert_eq!(canister_http_requests.len(), 0);
-    }
-
-    #[test]
-    fn test_dns_client_outlook_cname_resolution() {
-        let (pic, canister_id) = test_setup();
-        // Submit an update call to the test canister making a canister http outcall
-        let call_id = pic
-            .submit_call(
-                canister_id,
-                Principal::anonymous(),
-                "get_dkim_public_key",
-                Encode!(&"selector1", &"outlook.com", &1_000_000_000_000u64).unwrap(),
-            )
-            .unwrap();
-
-        let body = r#"
-            {
-                "Status": 0,
-                "TC": false,
-                "RD": true,
-                "RA": true,
-                "AD": false,
-                "CD": false,
-                "Question": [
-                    {
-                        "name": "selector1._domainkey.outlook.com.",
-                        "type": 16
-                    }
-                ],
-                "Answer": [
-                    {
-                        "name": "selector1._domainkey.outlook.com.",
-                        "type": 5,
-                        "TTL": 300,
-                        "data": "selector1._domainkey.outbound.protection.outlook.com."
-                    },
-                    {
-                        "name": "selector1._domainkey.outbound.protection.outlook.com.",
-                        "type": 16,
-                        "TTL": 600,
-                        "data": "v=DKIM1;k=rsa;p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvWyktrIL8DO/+UGvMbv7cPd/Xogpbs7pgVw8y9ldO6AAMmg8+ijENl/c7Fb1MfKM7uG3LMwAr0dVVKyM+mbkoX2k5L7lsROQr0Z9gGSpu7xrnZOa58+/pIhd2Xk/DFPpa5+TKbWodbsSZPRN8z0RY5x59jdzSclXlEyN9mEZdmOiKTsOP6A7vQxfSya9jg5N81dfNNvP7HnWejMMsKyIMrXptxOhIBuEYH67JDe98QgX14oHvGM2Uz53if/SW8MF09rYh9sp4ZsaWLIg6T343JzlbtrsGRGCDJ9JPpxRWZimtz+Up/BlKzT6sCCrBihb/Bi3pZiEBB4Ui/vruL5RCQIDAQAB"
-                    }
-                ],
-                "Comment": "Response from 150.171.16.36."
-            }
-            "#;
-        pic.tick();
-        pic.tick();
-        mock_http_response(&pic, body);
-        println!("res 1");
-        pic.tick();
-        mock_http_response(&pic, body);
-
-        // Now the test canister will receive the http outcall response
-        // and reply to the ingress message from the test driver.
-        let reply = pic.await_call(call_id).unwrap();
-        match reply {
-            WasmResult::Reply(data) => {
-                let http_response: Result<String, String> = decode_one(&data).unwrap();
-                assert_eq!(http_response.unwrap(), "0xbd6ca4b6b20bf033bff941af31bbfb70f77f5e88296ecee9815c3ccbd95d3ba00032683cfa28c4365fdcec56f531f28ceee1b72ccc00af475554ac8cfa66e4a17da4e4bee5b11390af467d8064a9bbbc6b9d939ae7cfbfa4885dd9793f0c53e96b9f9329b5a875bb1264f44df33d11639c79f6377349c957944c8df661197663a2293b0e3fa03bbd0c5f4b26bd8e0e4df3575f34dbcfec79d67a330cb0ac8832b5e9b713a1201b84607ebb2437bdf10817d78a07bc6336533e7789ffd25bc305d3dad887db29e19b1a58b220e93df8dc9ce56edaec1911820c9f493e9c515998a6b73f94a7f0652b34fab020ab06285bfc18b7a59884041e148bfbebb8be5109");
             }
             WasmResult::Reject(msg) => panic!("Unexpected reject {}", msg),
         };
